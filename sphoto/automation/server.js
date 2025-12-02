@@ -84,14 +84,16 @@ async function handleWebhook(req, res) {
             
             console.log(`Creating instance ${id} for ${customerEmail}`);
             sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
-            await createInstance(id, customerEmail, plan);
+            
+            sessionStatus.set(sessionId, { status: 'processing', message: 'Warte auf SSL-Zertifikat...' });
+            const result = await createInstance(id, customerEmail, plan);
             
             await stripe.customers.update(session.customer, {
               metadata: { sphoto_id: id }
             });
             
             sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
-            await sendWelcomeEmail(customerEmail, id, plan.name);
+            await sendWelcomeEmail(customerEmail, id, plan.name, plan.storage, result.password);
             
             // Mark as complete with instance URL
             sessionStatus.set(sessionId, { 
@@ -99,7 +101,8 @@ async function handleWebhook(req, res) {
               instanceId: id,
               instanceUrl: `https://${id}.${DOMAIN}`,
               email: customerEmail,
-              plan: plan.name
+              plan: plan.name,
+              autoSetup: result.success
             });
             
             console.log(`Instance ${id} created for ${customerEmail}`);
@@ -147,6 +150,98 @@ function generateId(email) {
   return `${base}-${suffix}`;
 }
 
+function generatePassword() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+async function waitForInstance(url, maxAttempts = 30) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch(`${url}/api/server/ping`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        console.log(`Instance ${url} is ready`);
+        return true;
+      }
+    } catch {
+      // Instance not ready yet
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  console.error(`Instance ${url} failed to become ready`);
+  return false;
+}
+
+async function setupImmichAdmin(instanceUrl, email, password, quotaBytes) {
+  try {
+    // First, sign up the admin user (first user becomes admin)
+    const signUpResponse = await fetch(`${instanceUrl}/api/auth/admin-sign-up`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        name: email.split('@')[0],
+      }),
+    });
+
+    if (!signUpResponse.ok) {
+      const error = await signUpResponse.text();
+      console.error('Admin signup failed:', error);
+      return false;
+    }
+
+    const adminUser = await signUpResponse.json();
+    console.log(`Admin user created: ${adminUser.email}`);
+
+    // Login to get access token
+    const loginResponse = await fetch(`${instanceUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!loginResponse.ok) {
+      console.error('Admin login failed');
+      return false;
+    }
+
+    const { accessToken } = await loginResponse.json();
+
+    // Set storage quota if specified
+    if (quotaBytes && adminUser.id) {
+      const updateResponse = await fetch(`${instanceUrl}/api/admin/users/${adminUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          quotaSizeInBytes: quotaBytes,
+        }),
+      });
+
+      if (updateResponse.ok) {
+        console.log(`Storage quota set to ${quotaBytes} bytes`);
+      } else {
+        console.error('Failed to set storage quota');
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Immich setup error:', err);
+    return false;
+  }
+}
+
 async function createInstance(id, email, plan) {
   console.log(`Creating instance: ${id} for ${email}`);
   
@@ -155,6 +250,8 @@ async function createInstance(id, email, plan) {
   mkdirSync(join(dir, 'db'), { recursive: true });
 
   const dbPass = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  const userPassword = generatePassword();
+  const quotaBytes = plan.storage * 1024 * 1024 * 1024; // Convert GB to bytes
 
   const compose = `
 name: sphoto-${id}
@@ -221,7 +318,28 @@ networks:
   const execAsync = promisify(exec);
   
   await execAsync(`cd ${dir} && docker compose up -d`);
-  console.log(`Instance ${id} created`);
+  console.log(`Instance ${id} containers started`);
+
+  // Wait for instance to be ready
+  const instanceUrl = `https://${id}.${DOMAIN}`;
+  const isReady = await waitForInstance(instanceUrl);
+  
+  if (isReady) {
+    // Setup admin user with quota
+    const setupSuccess = await setupImmichAdmin(instanceUrl, email, userPassword, quotaBytes);
+    if (setupSuccess) {
+      // Save password to metadata for reference
+      const metaPath = join(dir, 'metadata.json');
+      const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+      meta.initialPassword = userPassword;
+      writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+      console.log(`Instance ${id} fully configured`);
+      return { success: true, password: userPassword };
+    }
+  }
+  
+  console.log(`Instance ${id} created but auto-setup failed - manual setup required`);
+  return { success: false, password: null };
 }
 
 async function stopInstance(id) {
@@ -288,10 +406,25 @@ function listInstances() {
 // =============================================================================
 // E-Mail
 // =============================================================================
-async function sendWelcomeEmail(email, id, planName) {
+async function sendWelcomeEmail(email, id, planName, storageGb, password) {
   const url = `https://${id}.${DOMAIN}`;
   
-  await resend.emails.send({
+  const loginInfo = password 
+    ? `
+        <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Deine Login-Daten:</p>
+          <p style="margin: 5px 0;"><strong>E-Mail:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Passwort:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Bitte ändere dein Passwort nach dem ersten Login.</p>
+        </div>
+      `
+    : `
+        <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0;">Öffne die URL und erstelle deinen Admin-Account.</p>
+        </div>
+      `;
+
+  const { data, error } = await resend.emails.send({
     from: process.env.EMAIL_FROM || 'SPhoto <noreply@arturf.ch>',
     to: email,
     subject: '🎉 Deine SPhoto Cloud ist bereit!',
@@ -305,17 +438,19 @@ async function sendWelcomeEmail(email, id, planName) {
         <p>Deine persönliche Photo-Cloud ist bereit.</p>
         
         <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> ${planName}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> ${planName} (${storageGb} GB)</p>
           <p style="margin: 0;"><strong>Deine URL:</strong></p>
           <p style="margin: 5px 0 0 0; font-size: 18px;">
             <a href="${url}" style="color: #dc2626;">${url}</a>
           </p>
         </div>
         
+        ${loginInfo}
+        
         <h3>Nächste Schritte:</h3>
         <ol>
           <li>Öffne <a href="${url}">${url}</a></li>
-          <li>Erstelle deinen Account</li>
+          ${password ? '<li>Logge dich mit den obigen Daten ein</li>' : '<li>Erstelle deinen Account</li>'}
           <li>Lade die <strong>Immich App</strong> (iOS/Android)</li>
           <li>Verbinde mit: <code>${url}</code></li>
         </ol>
@@ -332,7 +467,11 @@ async function sendWelcomeEmail(email, id, planName) {
     `
   });
   
-  console.log(`Welcome email sent to ${email}`);
+  if (error) {
+    console.error('Email send error:', error);
+  } else {
+    console.log(`Welcome email sent to ${email}`);
+  }
 }
 
 async function sendPaymentFailedEmail(email, id) {
