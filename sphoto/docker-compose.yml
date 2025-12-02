@@ -1,0 +1,137 @@
+# =============================================================================
+# SPhoto - Complete Silo Stack
+# Domain: sphoto.arturf.ch
+# =============================================================================
+
+name: sphoto
+
+services:
+  # ===========================================================================
+  # Traefik - Reverse Proxy & Auto-SSL
+  # ===========================================================================
+  traefik:
+    image: traefik:v3.2
+    container_name: sphoto-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=sphoto-net"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - sphoto-net
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`admin.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=le"
+      - "traefik.http.routers.traefik.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
+
+  # ===========================================================================
+  # Machine Learning (Shared für alle Instanzen)
+  # ===========================================================================
+  ml:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: sphoto-ml
+    volumes:
+      - ml-cache:/cache
+    environment:
+      - MACHINE_LEARNING_WORKERS=2
+    networks:
+      - sphoto-net
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+
+  # ===========================================================================
+  # Automation Server (Stripe Webhooks)
+  # ===========================================================================
+  automation:
+    build: ./automation
+    container_name: sphoto-automation
+    environment:
+      - DOMAIN=${DOMAIN}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_BASIC=${STRIPE_PRICE_BASIC}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - IMMICH_VERSION=${IMMICH_VERSION:-release}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./instances:/data/instances
+    networks:
+      - sphoto-net
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=le"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+
+  # ===========================================================================
+  # Stats Dashboard
+  # ===========================================================================
+  stats:
+    build: ./stats
+    container_name: sphoto-stats
+    environment:
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    volumes:
+      - ./instances:/data/instances:ro
+    networks:
+      - sphoto-net
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stats.rule=Host(`stats.${DOMAIN}`)"
+      - "traefik.http.routers.stats.entrypoints=websecure"
+      - "traefik.http.routers.stats.tls.certresolver=le"
+      - "traefik.http.routers.stats.middlewares=auth"
+      - "traefik.http.services.stats.loadbalancer.server.port=3000"
+
+  # ===========================================================================
+  # Landing Page
+  # ===========================================================================
+  landing:
+    image: nginx:alpine
+    container_name: sphoto-landing
+    volumes:
+      - ./landing:/usr/share/nginx/html:ro
+    networks:
+      - sphoto-net
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.landing.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.landing.entrypoints=websecure"
+      - "traefik.http.routers.landing.tls.certresolver=le"
+      - "traefik.http.services.landing.loadbalancer.server.port=80"
+
+networks:
+  sphoto-net:
+    name: sphoto-net
+
+volumes:
+  traefik-certs:
+  ml-cache:

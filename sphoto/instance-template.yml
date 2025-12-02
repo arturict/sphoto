@@ -1,0 +1,53 @@
+# Template für Kunden-Instanzen
+# Wird vom Automation Server automatisch verwendet
+
+name: sphoto-{{ID}}
+
+services:
+  server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: sphoto-{{ID}}-server
+    environment:
+      - DB_URL=postgresql://sphoto:{{DB_PASS}}@db:5432/sphoto
+      - REDIS_HOSTNAME=redis
+      - MACHINE_LEARNING_URL=http://sphoto-ml:3003
+    volumes:
+      - ./uploads:/data
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - sphoto-net
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{ID}}.rule=Host(`{{ID}}.sphoto.arturf.ch`)"
+      - "traefik.http.routers.{{ID}}.entrypoints=websecure"
+      - "traefik.http.routers.{{ID}}.tls.certresolver=le"
+      - "traefik.http.services.{{ID}}.loadbalancer.server.port=2283"
+
+  db:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: sphoto-{{ID}}-db
+    environment:
+      - POSTGRES_PASSWORD={{DB_PASS}}
+      - POSTGRES_USER=sphoto
+      - POSTGRES_DB=sphoto
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    image: valkey/valkey:9
+    container_name: sphoto-{{ID}}-redis
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  sphoto-net:
+    external: true
+  internal:

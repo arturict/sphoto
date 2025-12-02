@@ -1,0 +1,12 @@
+{
+  "name": "sphoto-stats",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "stripe": "^14.0.0"
+  }
+}

@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-  <title>Oops! Error - SwissPhoto</title>
+  <title>Oops! Error - SPhoto</title>
 </svelte:head>
 
 <section class="flex flex-col px-4 h-dvh w-dvw place-content-center place-items-center">

@@ -48,14 +48,14 @@
 
   let showNavigationLoadingBar = $state(false);
 
-  const getMySwissPhotoLink = () => {
-    return new URL(page.url.pathname + page.url.search, 'https://swissphoto.ch');
+  const getMySPhotoLink = () => {
+    return new URL(page.url.pathname + page.url.search, 'https://sphoto.arturf.ch');
   };
 
   onMount(() => {
     const element = document.querySelector('#stencil');
     element?.remove();
-    // if the browser theme changes, changes the SwissPhoto theme too
+    // if the browser theme changes, changes the SPhoto theme too
   });
 
   eventManager.emit('AppInit');
@@ -175,7 +175,7 @@
 <CommandPaletteContext {commands} />
 
 <svelte:head>
-  <title>{page.data.meta?.title || 'Web'} - SwissPhoto</title>
+  <title>{page.data.meta?.title || 'Web'} - SPhoto</title>
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
   <meta name="theme-color" content="currentColor" />
   <AppleHeader />
@@ -216,7 +216,7 @@
 <svelte:document
   use:shortcut={{
     shortcut: { ctrl: true, shift: true, key: 'm' },
-    onShortcut: () => copyToClipboard(getMySwissPhotoLink().toString()),
+    onShortcut: () => copyToClipboard(getMySPhotoLink().toString()),
   }}
 />
 

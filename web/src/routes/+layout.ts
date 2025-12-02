@@ -27,7 +27,7 @@ export const load = (async ({ fetch, url }) => {
   return {
     error,
     meta: {
-      title: 'SwissPhoto',
+      title: 'SPhoto',
     },
   };
 }) satisfies LayoutLoad;

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPhoto - Günstige Foto-Cloud</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .s-red { color: #dc2626; }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  
+  <!-- Nav -->
+  <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+    <div class="text-2xl font-bold">
+      <span class="s-red">S</span>Photo
+    </div>
+    <a href="#preise" class="bg-red-600 px-6 py-2 rounded-full hover:bg-red-700">
+      Jetzt starten
+    </a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="container mx-auto px-6 py-20 text-center">
+    <h1 class="text-5xl font-bold mb-6">
+      Deine Fotos. <span class="s-red">Deine Cloud.</span>
+    </h1>
+    <p class="text-xl text-gray-400 mb-8 max-w-xl mx-auto">
+      Günstige, private Foto-Speicherung. Ab CHF 5.-/Monat.
+    </p>
+    <div class="flex justify-center gap-8 text-gray-400">
+      <span>🔒 Privat</span>
+      <span>📱 iOS & Android</span>
+      <span>🔍 KI-Suche</span>
+    </div>
+  </header>
+
+  <!-- Warning -->
+  <div class="bg-amber-600 text-black py-2 text-center text-sm">
+    ⚠️ Budget-Service ohne Backup - Erstelle eigene Backups!
+  </div>
+
+  <!-- Pricing -->
+  <section id="preise" class="container mx-auto px-6 py-20">
+    <h2 class="text-3xl font-bold text-center mb-12">Einfache Preise</h2>
+    
+    <div class="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+      
+      <!-- Basic -->
+      <div class="bg-gray-800 rounded-xl p-8">
+        <h3 class="text-xl font-semibold mb-2">Basic</h3>
+        <div class="text-4xl font-bold mb-1">
+          CHF 5.-<span class="text-lg text-gray-400">/Mt.</span>
+        </div>
+        <p class="text-gray-400 mb-6">200 GB Speicher</p>
+        <ul class="space-y-2 text-gray-300 mb-6">
+          <li>✓ Eigene Subdomain</li>
+          <li>✓ KI-Bildersuche</li>
+          <li>✓ Gesichtserkennung</li>
+          <li>✓ Mobile App</li>
+          <li>✓ Alben teilen</li>
+        </ul>
+        <a href="STRIPE_BASIC_LINK" class="block text-center bg-gray-700 py-3 rounded-lg hover:bg-gray-600">
+          Auswählen
+        </a>
+      </div>
+
+      <!-- Pro -->
+      <div class="bg-red-600 rounded-xl p-8 transform scale-105">
+        <div class="text-xs font-bold bg-white text-red-600 px-2 py-1 rounded inline-block mb-2">
+          BELIEBT
+        </div>
+        <h3 class="text-xl font-semibold mb-2">Pro</h3>
+        <div class="text-4xl font-bold mb-1">
+          CHF 15.-<span class="text-lg text-red-200">/Mt.</span>
+        </div>
+        <p class="text-red-200 mb-6">1 TB Speicher</p>
+        <ul class="space-y-2 mb-6">
+          <li>✓ Alles von Basic</li>
+          <li>✓ 1 TB Speicher</li>
+          <li>✓ API-Zugang</li>
+          <li>✓ Priority Support</li>
+        </ul>
+        <a href="STRIPE_PRO_LINK" class="block text-center bg-white text-red-600 py-3 rounded-lg font-semibold hover:bg-gray-100">
+          Auswählen
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="container mx-auto px-6 py-20">
+    <h2 class="text-3xl font-bold text-center mb-12">So funktioniert's</h2>
+    <div class="flex justify-center items-center gap-8 flex-wrap">
+      <div class="text-center">
+        <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-2">1</div>
+        <p>Plan wählen</p>
+      </div>
+      <div class="text-2xl text-gray-600">→</div>
+      <div class="text-center">
+        <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-2">2</div>
+        <p>Sofort bereit</p>
+      </div>
+      <div class="text-2xl text-gray-600">→</div>
+      <div class="text-center">
+        <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-2">3</div>
+        <p>App verbinden</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="container mx-auto px-6 py-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+    <p>Basiert auf <a href="https://immich.app" class="text-red-500 hover:underline">Immich</a> (Open Source)</p>
+    <p class="mt-2">© 2024 sphoto.arturf.ch</p>
+  </footer>
+
+</body>
+</html>
