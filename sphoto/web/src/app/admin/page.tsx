@@ -1,13 +1,31 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { 
-  RefreshCw, Server, HardDrive, Play, Square, Trash2, 
-  ExternalLink, Users, Activity, AlertTriangle
+import {
+  Activity,
+  AlertTriangle,
+  Clock4,
+  ExternalLink,
+  Filter,
+  HardDrive,
+  Play,
+  RefreshCw,
+  Search,
+  Server,
+  ShieldCheck,
+  Square,
+  Trash2,
+  Users,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
@@ -16,13 +34,27 @@ const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
 interface Instance {
   id: string
   email: string
-  plan: string
+  plan: "Basic" | "Pro" | string
   storage_gb: number
   status: "active" | "stopped" | "deleted"
   created: string
   stopped_at?: string
 }
 
+type StatusFilter = "all" | Instance["status"]
+type PlanFilter = "all" | "Basic" | "Pro"
+
+const statusPalette: Record<Instance["status"], string> = {
+  active: "bg-green-500/10 text-green-600",
+  stopped: "bg-amber-500/10 text-amber-600",
+  deleted: "bg-red-500/10 text-red-600",
+}
+
+const statusLabel: Record<Instance["status"], string> = {
+  active: "Aktiv",
+  stopped: "Gestoppt",
+  deleted: "Gelöscht",
+}
 export default function AdminPage() {
   const [apiKey, setApiKey] = useState("")
   const [isAuthed, setIsAuthed] = useState(false)
@@ -30,81 +62,235 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [lastSync, setLastSync] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [filters, setFilters] = useState<{ query: string; status: StatusFilter; plan: PlanFilter }>({
+    query: "",
+    status: "all",
+    plan: "all",
+  })
 
   useEffect(() => {
-    const stored = localStorage.getItem("admin_api_key")
+    const stored = typeof window !== "undefined" ? localStorage.getItem("admin_api_key") : null
     if (stored) {
       setApiKey(stored)
       setIsAuthed(true)
     }
   }, [])
 
-  const api = useCallback(async (endpoint: string, method = "GET") => {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method,
-      headers: { "x-api-key": apiKey }
-    })
-    if (res.status === 401) {
-      localStorage.removeItem("admin_api_key")
-      setIsAuthed(false)
-      setApiKey("")
-      return null
+  const api = useCallback(async (endpoint: string, method: "GET" | "POST" | "DELETE" = "GET") => {
+    if (!apiKey) {
+      throw new Error("Kein API Key gesetzt")
     }
-    return res.json()
+    setError(null)
+    try {
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method,
+        headers: {
+          "x-api-key": apiKey,
+        },
+      })
+
+      if (res.status === 401) {
+        localStorage.removeItem("admin_api_key")
+        setIsAuthed(false)
+        setApiKey("")
+        throw new Error("API Key ungültig oder abgelaufen")
+      }
+
+      if (res.status === 204) {
+        return null
+      }
+
+      const isJson = res.headers.get("content-type")?.includes("application/json")
+      const payload = isJson ? await res.json() : await res.text()
+
+      if (!res.ok) {
+        const message = typeof payload === "string" ? payload : payload?.message
+        throw new Error(message || "Unbekannter API Fehler")
+      }
+
+      return payload
+    } catch (err) {
+      if ((err as DOMException)?.name === "AbortError") {
+        return null
+      }
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler")
+      throw err
+    }
   }, [apiKey])
 
-  const loadInstances = useCallback(async () => {
+  const loadInstances = useCallback(async (options?: { silent?: boolean }) => {
     if (!apiKey) return
-    setLoading(true)
-    const data = await api("/api/instances")
-    if (data) setInstances(data)
-    setLoading(false)
+    if (!options?.silent) {
+      setLoading(true)
+    }
+    try {
+      const data = await api("/api/instances")
+      if (Array.isArray(data)) {
+        setInstances(data)
+        setLastSync(new Date())
+      }
+    } catch {
+      // Fehler bereits gesetzt
+    } finally {
+      if (!options?.silent) {
+        setLoading(false)
+      }
+    }
   }, [api, apiKey])
 
   useEffect(() => {
-    if (isAuthed) loadInstances()
+    if (isAuthed) {
+      loadInstances()
+    }
   }, [isAuthed, loadInstances])
 
+  useEffect(() => {
+    if (!autoRefresh || !isAuthed) return
+    const interval = setInterval(() => {
+      loadInstances({ silent: true })
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, isAuthed, loadInstances])
+
   const handleLogin = () => {
+    if (!apiKey) return
     localStorage.setItem("admin_api_key", apiKey)
     setIsAuthed(true)
   }
 
-  const handleAction = async (id: string, action: "start" | "stop" | "delete") => {
-    setActionLoading(id)
-    if (action === "delete") {
-      await api(`/api/instances/${id}`, "DELETE")
-    } else {
-      await api(`/api/instances/${id}/${action}`, "POST")
-    }
-    setDeleteConfirm(null)
-    await loadInstances()
-    setActionLoading(null)
+  const handleLogout = () => {
+    localStorage.removeItem("admin_api_key")
+    setIsAuthed(false)
+    setApiKey("")
+    setInstances([])
+    setLastSync(null)
   }
 
-  // Stats
-  const activeCount = instances.filter(i => i.status === "active").length
-  const stoppedCount = instances.filter(i => i.status === "stopped").length
-  const totalStorage = instances.reduce((sum, i) => sum + (i.storage_gb || 0), 0)
+  const handleAction = async (id: string, action: "start" | "stop" | "delete") => {
+    setActionLoading(id)
+    try {
+      if (action === "delete") {
+        await api(`/api/instances/${id}`, "DELETE")
+      } else {
+        await api(`/api/instances/${id}/${action}`, "POST")
+      }
+      setDeleteConfirm(null)
+      await loadInstances({ silent: true })
+    } catch {
+      // bereits behandelt
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
+  const resetFilters = () => setFilters({ query: "", status: "all", plan: "all" })
+  const filteredInstances = useMemo(() => {
+    const normalizedQuery = filters.query.trim().toLowerCase()
+    return instances.filter((instance) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        instance.id.toLowerCase().includes(normalizedQuery) ||
+        instance.email.toLowerCase().includes(normalizedQuery)
+      const matchesPlan = filters.plan === "all" || instance.plan === filters.plan
+      const matchesStatus = filters.status === "all" || instance.status === filters.status
+      return matchesQuery && matchesPlan && matchesStatus
+    })
+  }, [instances, filters])
+
+  const sortedInstances = useMemo(() => {
+    return [...filteredInstances].sort(
+      (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+    )
+  }, [filteredInstances])
+
+  const activeCount = instances.filter((instance) => instance.status === "active").length
+  const stoppedCount = instances.filter((instance) => instance.status === "stopped").length
+  const totalStorage = instances.reduce((sum, instance) => sum + (instance.storage_gb || 0), 0)
+
+  const planBreakdown = useMemo(() => {
+    return instances.reduce((acc, instance) => {
+      const key = instance.plan || "Unbekannt"
+      if (!acc[key]) {
+        acc[key] = { count: 0, storage: 0 }
+      }
+      acc[key].count += 1
+      acc[key].storage += instance.storage_gb || 0
+      return acc
+    }, {} as Record<string, { count: number; storage: number }>)
+  }, [instances])
+
+  const planEntries = useMemo(() => {
+    const entries = Object.entries(planBreakdown).map(([plan, value]) => ({
+      plan,
+      ...value,
+    }))
+    const order = ["Pro", "Basic"]
+    return entries.sort((a, b) => {
+      const indexA = order.indexOf(a.plan)
+      const indexB = order.indexOf(b.plan)
+      if (indexA === -1 && indexB === -1) return a.plan.localeCompare(b.plan)
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+  }, [planBreakdown])
+
+  const recentActivity = useMemo(() => {
+    return instances
+      .map((instance) => {
+        const timestamp = instance.stopped_at ? new Date(instance.stopped_at) : new Date(instance.created)
+        return {
+          id: instance.id,
+          label:
+            instance.status === "deleted"
+              ? "Gelöscht"
+              : instance.status === "active"
+                ? "Gestartet"
+                : "Gestoppt",
+          timestamp,
+        }
+      })
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 5)
+  }, [instances])
+
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat("de-CH", { maximumFractionDigits: 0 }),
+    []
+  )
+
+  const formatDate = (value?: string) =>
+    value ? new Date(value).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"
+
+  const formatDateTime = (value: Date) =>
+    value.toLocaleString("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+
+  const planOptions: PlanFilter[] = ["all", "Basic", "Pro"]
+  const statusOptions: StatusFilter[] = ["all", "active", "stopped", "deleted"]
   if (!isAuthed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-primary">S</span>Photo Admin
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <span>SPhoto Admin</span>
             </CardTitle>
+            <CardDescription>API Key eingeben um die Instanzen zu verwalten.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
               type="password"
               placeholder="Admin API Key"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              onChange={(event) => setApiKey(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleLogin()}
             />
-            <Button className="w-full" onClick={handleLogin}>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button className="w-full" onClick={handleLogin} disabled={!apiKey.trim()}>
               Anmelden
             </Button>
           </CardContent>
@@ -115,174 +301,296 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">
-            <span className="text-primary">S</span>Photo Admin
-          </h1>
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary">{instances.length} Instances</Badge>
-            <Button variant="outline" size="sm" onClick={loadInstances} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh
+      <header className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70 sticky top-0 z-20">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-4 py-4">
+          <div>
+            <p className="text-xl font-semibold">
+              <span className="text-primary">S</span>Photo Dashboard
+            </p>
+            <p className="text-sm text-muted-foreground">Managed Immich Instanzen</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Badge variant="secondary">{instances.length} Instanzen</Badge>
+            {lastSync && (
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Clock4 className="h-4 w-4" />
+                Letztes Update {formatDateTime(lastSync)}
+              </span>
+            )}
+            <label className="flex items-center gap-2 text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(event) => setAutoRefresh(event.target.checked)}
+                className="h-4 w-4 rounded border-muted"
+              />
+              Auto-Refresh 15s
+            </label>
+            <Button variant="outline" size="sm" onClick={() => loadInstances()} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Aktualisieren
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              Logout
             </Button>
           </div>
         </div>
       </header>
+      <main className="container mx-auto space-y-8 px-4 py-8">
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <Server className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-3xl font-bold">{instances.length}</p>
-                </div>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <Server className="h-10 w-10 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Instanzen</p>
+                <p className="text-2xl font-semibold">{instances.length}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <Activity className="h-8 w-8 text-green-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                  <p className="text-3xl font-bold text-green-500">{activeCount}</p>
-                </div>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <Activity className="h-10 w-10 text-green-500" />
+              <div>
+                <p className="text-sm text-muted-foreground">Aktiv</p>
+                <p className="text-2xl font-semibold">{activeCount}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <AlertTriangle className="h-8 w-8 text-yellow-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Stopped</p>
-                  <p className="text-3xl font-bold text-yellow-500">{stoppedCount}</p>
-                </div>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+              <div>
+                <p className="text-sm text-muted-foreground">Gestoppt</p>
+                <p className="text-2xl font-semibold">{stoppedCount}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <HardDrive className="h-8 w-8 text-blue-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Storage</p>
-                  <p className="text-3xl font-bold text-blue-500">{totalStorage} GB</p>
-                </div>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <HardDrive className="h-10 w-10 text-blue-500" />
+              <div>
+                <p className="text-sm text-muted-foreground">Speicher</p>
+                <p className="text-2xl font-semibold">{numberFormatter.format(totalStorage)} GB</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Instances Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" /> Instances
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Filter className="h-4 w-4" />
+              Filter
             </CardTitle>
+            <CardDescription>Suche nach Subdomain, E-Mail, Status oder Plan.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {instances.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Keine Instanzen gefunden
+          <CardContent className="grid gap-4 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium text-muted-foreground">Suche</label>
+              <div className="relative mt-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={filters.query}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+                  className="pl-9"
+                  placeholder="artur, nils, kunde@domain.ch"
+                />
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Status</label>
+              <select
+                value={filters.status}
+                onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value as StatusFilter }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status === "all" ? "Alle" : statusLabel[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Plan</label>
+              <select
+                value={filters.plan}
+                onChange={(event) => setFilters((prev) => ({ ...prev, plan: event.target.value as PlanFilter }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {planOptions.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {plan === "all" ? "Alle" : plan}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardContent>
+          <CardContent className="border-t pt-4">
+            <Button variant="ghost" size="sm" onClick={resetFilters}>
+              Filter zurücksetzen
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-6 lg:grid-cols-[2.6fr,1fr]">
+          <Card className="overflow-hidden">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-lg">
+                <span>Instanzen</span>
+                <Badge variant="secondary">{filteredInstances.length} Ergebnis(se)</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {loading && (
+                <div className="py-6 text-center text-sm text-muted-foreground">Lade Instanzen…</div>
+              )}
+              {!loading && sortedInstances.length === 0 && (
+                <div className="py-6 text-center text-sm text-muted-foreground">Keine Instanzen gefunden.</div>
+              )}
+              {!loading && sortedInstances.length > 0 && (
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">ID</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Email</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Plan</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Storage</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Created</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="pb-3">Subdomain</th>
+                      <th className="pb-3">Plan</th>
+                      <th className="pb-3">Speicher</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3">Erstellt</th>
+                      <th className="pb-3 text-right">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {instances.map((instance) => (
-                      <tr key={instance.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4">
-                          <a 
-                            href={`https://${instance.id}.${DOMAIN}`} 
-                            target="_blank" 
-                            className="text-primary hover:underline flex items-center gap-1"
-                          >
-                            {instance.id}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </td>
-                        <td className="py-3 px-4 text-sm">{instance.email}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={instance.plan === "Pro" ? "default" : "secondary"}>
-                            {instance.plan}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-sm">{instance.storage_gb} GB</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={instance.status === "active" ? "success" : "warning"}>
-                            {instance.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground">
-                          {new Date(instance.created).toLocaleDateString("de-CH")}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex justify-end gap-2">
-                            {instance.status === "active" ? (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleAction(instance.id, "stop")}
-                                disabled={actionLoading === instance.id}
-                              >
-                                <Square className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleAction(instance.id, "start")}
-                                disabled={actionLoading === instance.id}
-                              >
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {deleteConfirm === instance.id ? (
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={() => handleAction(instance.id, "delete")}
-                                disabled={actionLoading === instance.id}
-                              >
-                                Confirm
-                              </Button>
-                            ) : (
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => setDeleteConfirm(instance.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {sortedInstances.map((instance) => {
+                      const isDeleted = instance.status === "deleted"
+                      const canStop = instance.status === "active"
+                      const canStart = instance.status === "stopped"
+                      return (
+                        <tr key={instance.id} className="border-b last:border-0">
+                          <td className="py-3">
+                            <a
+                              href={`https://${instance.id}.${DOMAIN}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 font-medium text-primary"
+                            >
+                              {instance.id}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <p className="text-xs text-muted-foreground">{instance.email}</p>
+                          </td>
+                          <td className="py-3">
+                            <Badge variant={instance.plan === "Pro" ? "default" : "secondary"}>{instance.plan}</Badge>
+                          </td>
+                          <td className="py-3 text-muted-foreground">
+                            {numberFormatter.format(instance.storage_gb || 0)} GB
+                          </td>
+                          <td className="py-3">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusPalette[instance.status]}`}>
+                              {statusLabel[instance.status]}
+                            </span>
+                          </td>
+                          <td className="py-3 text-sm text-muted-foreground">{formatDate(instance.created)}</td>
+                          <td className="py-3">
+                            <div className="flex justify-end gap-2">
+                              {(canStart || canStop) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAction(instance.id, canStop ? "stop" : "start")}
+                                  disabled={actionLoading === instance.id}
+                                >
+                                  {canStop ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                              )}
+                              {!isDeleted && (
+                                deleteConfirm === instance.id ? (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleAction(instance.id, "delete")}
+                                    disabled={actionLoading === instance.id}
+                                  >
+                                    Bestätigen
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDeleteConfirm(instance.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Plan Überblick</CardTitle>
+                <CardDescription>Verteilung nach Tarifen</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {planEntries.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Noch keine Instanzen.</p>
+                )}
+                {planEntries.map((entry) => {
+                  const percentage = instances.length ? Math.round((entry.count / instances.length) * 100) : 0
+                  return (
+                    <div key={entry.plan}>
+                      <div className="flex items-center justify-between text-sm font-medium">
+                        <span>{entry.plan}</span>
+                        <span>
+                          {entry.count} · {entry.storage} GB
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Aktivitäten</CardTitle>
+                <CardDescription>Letzte 5 Ereignisse</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {recentActivity.length === 0 && (
+                  <p className="text-muted-foreground">Noch keine Aktivitäten.</p>
+                )}
+                {recentActivity.map((event) => (
+                  <div key={event.id + event.timestamp.toISOString()} className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{event.label}</p>
+                      <p className="text-xs text-muted-foreground">{event.id}.{DOMAIN}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   )
