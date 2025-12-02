@@ -57,12 +57,19 @@ async function handleWebhook(req, res) {
         const session = event.data.object;
         const sessionId = session.id;
         
-        console.log(`Session mode: ${session.mode}, email: ${session.customer_email}`);
+        // Get email from customer object if not directly on session
+        let customerEmail = session.customer_email;
+        if (!customerEmail && session.customer) {
+          const customer = await stripe.customers.retrieve(session.customer);
+          customerEmail = customer.email;
+        }
+        
+        console.log(`Session mode: ${session.mode}, email: ${customerEmail}`);
         
         // Mark as processing
         sessionStatus.set(sessionId, { status: 'processing', message: 'Erstelle deine Cloud...' });
         
-        if (session.mode === 'subscription' && session.customer_email) {
+        if (session.mode === 'subscription' && customerEmail) {
           const sub = await stripe.subscriptions.retrieve(session.subscription);
           const priceId = sub.items.data[0].price.id;
           const plan = PLANS[priceId];
@@ -73,29 +80,29 @@ async function handleWebhook(req, res) {
           console.log(`Plan found: ${plan ? plan.name : 'NOT FOUND'}`);
           
           if (plan) {
-            const id = generateId(session.customer_email);
+            const id = generateId(customerEmail);
             
-            console.log(`Creating instance ${id} for ${session.customer_email}`);
+            console.log(`Creating instance ${id} for ${customerEmail}`);
             sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
-            await createInstance(id, session.customer_email, plan);
+            await createInstance(id, customerEmail, plan);
             
             await stripe.customers.update(session.customer, {
               metadata: { sphoto_id: id }
             });
             
             sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
-            await sendWelcomeEmail(session.customer_email, id, plan.name);
+            await sendWelcomeEmail(customerEmail, id, plan.name);
             
             // Mark as complete with instance URL
             sessionStatus.set(sessionId, { 
               status: 'complete', 
               instanceId: id,
               instanceUrl: `https://${id}.${DOMAIN}`,
-              email: session.customer_email,
+              email: customerEmail,
               plan: plan.name
             });
             
-            console.log(`Instance ${id} created for ${session.customer_email}`);
+            console.log(`Instance ${id} created for ${customerEmail}`);
           } else {
             sessionStatus.set(sessionId, { status: 'error', message: 'Plan nicht erkannt. Bitte kontaktiere den Support.' });
             console.error(`Unknown price ID: ${priceId}`);
@@ -368,7 +375,8 @@ app.get('/checkout/:plan', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `https://${DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://${DOMAIN}`,
-      customer_email: req.query.email || undefined,
+      customer_creation: 'always',
+      billing_address_collection: 'auto',
     });
     
     res.redirect(303, session.url);
