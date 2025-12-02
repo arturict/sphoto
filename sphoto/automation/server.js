@@ -375,8 +375,6 @@ app.get('/checkout/:plan', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `https://${DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://${DOMAIN}`,
-      customer_creation: 'always',
-      billing_address_collection: 'auto',
     });
     
     res.redirect(303, session.url);
