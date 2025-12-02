@@ -10,7 +10,7 @@ services:
   # Traefik - Reverse Proxy & Auto-SSL
   # ===========================================================================
   traefik:
-    image: traefik:v3.2
+    image: traefik:v2.11
     container_name: sphoto-traefik
     command:
       - "--api.dashboard=true"
