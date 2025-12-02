@@ -1,0 +1,96 @@
+# =============================================================================
+# SwissPhoto Shared Services
+# =============================================================================
+# Diese Services laufen EINMAL und werden von allen Instanzen geteilt
+# =============================================================================
+
+name: swissphoto-shared
+
+services:
+  # =========================================================================
+  # Machine Learning Service (CPU-basiert)
+  # =========================================================================
+  # EINE Instanz für ALLE Kunden
+  # Bei 128GB RAM: Grosszügige Limits
+  # =========================================================================
+  machine-learning:
+    container_name: swissphoto-ml
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    volumes:
+      - ml-cache:/cache
+    environment:
+      - MACHINE_LEARNING_WORKERS=4
+      - MACHINE_LEARNING_WORKER_TIMEOUT=120
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 8G
+    networks:
+      - swissphoto-shared
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================================================
+  # Traefik Reverse Proxy
+  # =========================================================================
+  # Routet *.swissphoto.ch zu den richtigen Instanzen
+  # Automatische SSL-Zertifikate via Let's Encrypt
+  # =========================================================================
+  traefik:
+    container_name: swissphoto-traefik
+    image: traefik:v3.2
+    command:
+      # API Dashboard (nur intern)
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # Docker Provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=swissphoto-shared"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.websecure.address=:443"
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@swissphoto.ch}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Logging
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard (nur lokal zugänglich machen!)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    restart: always
+    networks:
+      - swissphoto-shared
+    labels:
+      # Dashboard auf admin.swissphoto.ch
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`admin.swissphoto.ch`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      # Basic Auth für Dashboard (generiere mit: htpasswd -nb admin password)
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_ADMIN_AUTH}"
+
+networks:
+  swissphoto-shared:
+    name: swissphoto-shared
+    driver: bridge
+
+volumes:
+  ml-cache:
+    name: swissphoto-ml-cache
+  traefik-certs:
+    name: swissphoto-traefik-certs
