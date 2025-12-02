@@ -77,7 +77,7 @@ services:
       - IMMICH_VERSION=${IMMICH_VERSION:-release}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./instances:/data/instances
+      - /data/instances:/data/instances
     networks:
       - sphoto-net
     restart: always
@@ -100,7 +100,7 @@ services:
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
     volumes:
-      - ./instances:/data/instances:ro
+      - /data/instances:/data/instances:ro
     networks:
       - sphoto-net
     restart: always

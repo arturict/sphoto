@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPhoto Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .status-active { color: #22c55e; }
+    .status-stopped { color: #f59e0b; }
+    .status-deleted { color: #ef4444; }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  
+  <!-- Header -->
+  <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <h1 class="text-xl font-bold"><span class="text-red-500">S</span>Photo Admin</h1>
+      <div class="flex items-center gap-4">
+        <span id="instance-count" class="text-gray-400 text-sm"></span>
+        <button onclick="loadInstances()" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-sm">
+          ↻ Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-800 rounded-xl p-4">
+        <div class="text-gray-400 text-sm">Total Instances</div>
+        <div id="stat-total" class="text-3xl font-bold">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-4">
+        <div class="text-gray-400 text-sm">Active</div>
+        <div id="stat-active" class="text-3xl font-bold text-green-500">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-4">
+        <div class="text-gray-400 text-sm">Stopped</div>
+        <div id="stat-stopped" class="text-3xl font-bold text-yellow-500">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-4">
+        <div class="text-gray-400 text-sm">Total Storage</div>
+        <div id="stat-storage" class="text-3xl font-bold text-blue-500">-</div>
+      </div>
+    </div>
+
+    <!-- Instances Table -->
+    <div class="bg-gray-800 rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-700">
+        <h2 class="font-semibold">Instances</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-700/50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Email</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Plan</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Storage</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="instances-table" class="divide-y divide-gray-700">
+            <tr>
+              <td colspan="7" class="px-6 py-8 text-center text-gray-500">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
+      <h3 id="modal-title" class="text-lg font-semibold mb-4"></h3>
+      <p id="modal-message" class="text-gray-400 mb-6"></p>
+      <div class="flex gap-3 justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">
+          Abbrechen
+        </button>
+        <button id="modal-confirm" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg">
+          Bestätigen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'https://api.sphoto.arturf.ch';
+    const API_KEY = localStorage.getItem('admin_api_key') || prompt('Admin API Key:');
+    
+    if (API_KEY) {
+      localStorage.setItem('admin_api_key', API_KEY);
+    }
+
+    let instances = [];
+
+    async function api(endpoint, method = 'GET') {
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method,
+        headers: { 'x-api-key': API_KEY }
+      });
+      if (res.status === 401) {
+        localStorage.removeItem('admin_api_key');
+        alert('Ungültiger API Key');
+        location.reload();
+        return null;
+      }
+      return res.json();
+    }
+
+    async function loadInstances() {
+      instances = await api('/api/instances') || [];
+      
+      // Update stats
+      const active = instances.filter(i => i.status === 'active').length;
+      const stopped = instances.filter(i => i.status === 'stopped').length;
+      const totalStorage = instances.reduce((sum, i) => sum + (i.storage_gb || 0), 0);
+      
+      document.getElementById('stat-total').textContent = instances.length;
+      document.getElementById('stat-active').textContent = active;
+      document.getElementById('stat-stopped').textContent = stopped;
+      document.getElementById('stat-storage').textContent = `${totalStorage} GB`;
+      document.getElementById('instance-count').textContent = `${instances.length} instances`;
+      
+      // Render table
+      const tbody = document.getElementById('instances-table');
+      
+      if (instances.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+              Keine Instanzen gefunden
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      tbody.innerHTML = instances.map(i => `
+        <tr class="hover:bg-gray-700/50">
+          <td class="px-6 py-4">
+            <a href="https://${i.id}.sphoto.arturf.ch" target="_blank" class="text-blue-400 hover:underline">
+              ${i.id}
+            </a>
+          </td>
+          <td class="px-6 py-4 text-gray-300">${i.email}</td>
+          <td class="px-6 py-4">
+            <span class="px-2 py-1 rounded text-xs ${i.plan === 'Pro' ? 'bg-red-500/20 text-red-400' : 'bg-gray-700 text-gray-300'}">
+              ${i.plan}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-gray-300">${i.storage_gb} GB</td>
+          <td class="px-6 py-4">
+            <span class="status-${i.status} font-medium">${i.status}</span>
+          </td>
+          <td class="px-6 py-4 text-gray-400 text-sm">${formatDate(i.created)}</td>
+          <td class="px-6 py-4">
+            <div class="flex gap-2">
+              ${i.status === 'active' 
+                ? `<button onclick="stopInstance('${i.id}')" class="px-2 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded text-xs">Stop</button>`
+                : `<button onclick="startInstance('${i.id}')" class="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded text-xs">Start</button>`
+              }
+              <button onclick="confirmDelete('${i.id}')" class="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-xs">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function formatDate(iso) {
+      return new Date(iso).toLocaleDateString('de-CH', { 
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    async function startInstance(id) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '...';
+      await api(`/api/instances/${id}/start`, 'POST');
+      await loadInstances();
+    }
+
+    async function stopInstance(id) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '...';
+      await api(`/api/instances/${id}/stop`, 'POST');
+      await loadInstances();
+    }
+
+    let deleteId = null;
+
+    function confirmDelete(id) {
+      deleteId = id;
+      document.getElementById('modal-title').textContent = 'Instance löschen?';
+      document.getElementById('modal-message').textContent = `Bist du sicher, dass du "${id}" löschen willst? Alle Daten werden unwiderruflich gelöscht.`;
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').classList.remove('flex');
+      deleteId = null;
+    }
+
+    document.getElementById('modal-confirm').onclick = async () => {
+      if (deleteId) {
+        await api(`/api/instances/${deleteId}`, 'DELETE');
+        closeModal();
+        await loadInstances();
+      }
+    };
+
+    // Initial load
+    if (API_KEY) {
+      loadInstances();
+    }
+  </script>
+</body>
+</html>
