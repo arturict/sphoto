@@ -57,6 +57,8 @@ async function handleWebhook(req, res) {
         const session = event.data.object;
         const sessionId = session.id;
         
+        console.log(`Session mode: ${session.mode}, email: ${session.customer_email}`);
+        
         // Mark as processing
         sessionStatus.set(sessionId, { status: 'processing', message: 'Erstelle deine Cloud...' });
         
@@ -65,9 +67,15 @@ async function handleWebhook(req, res) {
           const priceId = sub.items.data[0].price.id;
           const plan = PLANS[priceId];
           
+          console.log(`Price ID from Stripe: ${priceId}`);
+          console.log(`STRIPE_PRICE_BASIC env: ${process.env.STRIPE_PRICE_BASIC}`);
+          console.log(`STRIPE_PRICE_PRO env: ${process.env.STRIPE_PRICE_PRO}`);
+          console.log(`Plan found: ${plan ? plan.name : 'NOT FOUND'}`);
+          
           if (plan) {
             const id = generateId(session.customer_email);
             
+            console.log(`Creating instance ${id} for ${session.customer_email}`);
             sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
             await createInstance(id, session.customer_email, plan);
             
