@@ -1,0 +1,133 @@
+# =============================================================================
+# SwissPhoto Full Stack - Automatisierte Silo-Architektur
+# =============================================================================
+# Domain: arturferreira.tech
+# 
+# Enthält:
+# - Traefik (Reverse Proxy + Auto-SSL)
+# - Machine Learning (Shared, CPU-basiert)
+# - Automation Server (Stripe Webhooks)
+# - Landingpage (optional)
+# =============================================================================
+
+name: swissphoto-core
+
+services:
+  # =========================================================================
+  # Traefik - Reverse Proxy
+  # =========================================================================
+  traefik:
+    container_name: swissphoto-traefik
+    image: traefik:v3.2
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=swissphoto-shared"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    restart: always
+    networks:
+      - swissphoto-shared
+    labels:
+      - "traefik.enable=true"
+      # Dashboard auf admin.arturferreira.tech
+      - "traefik.http.routers.dashboard.rule=Host(`admin.arturferreira.tech`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_AUTH}"
+
+  # =========================================================================
+  # Machine Learning Service (Shared)
+  # =========================================================================
+  machine-learning:
+    container_name: swissphoto-ml
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    volumes:
+      - ml-cache:/cache
+    environment:
+      - MACHINE_LEARNING_WORKERS=4
+      - MACHINE_LEARNING_WORKER_TIMEOUT=120
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 8G
+    networks:
+      - swissphoto-shared
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================================================
+  # Automation Server (Stripe Webhooks)
+  # =========================================================================
+  automation:
+    container_name: swissphoto-automation
+    build: ../automation
+    environment:
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - IMMICH_VERSION=${IMMICH_VERSION:-release}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/swissphoto/instances:/opt/swissphoto/instances
+    restart: always
+    networks:
+      - swissphoto-shared
+    labels:
+      - "traefik.enable=true"
+      # Webhook Endpoint auf api.arturferreira.tech
+      - "traefik.http.routers.automation.rule=Host(`api.arturferreira.tech`)"
+      - "traefik.http.routers.automation.entrypoints=websecure"
+      - "traefik.http.routers.automation.tls.certresolver=letsencrypt"
+      - "traefik.http.services.automation.loadbalancer.server.port=3500"
+
+  # =========================================================================
+  # Landingpage (Optional - Statische Seite)
+  # =========================================================================
+  landingpage:
+    container_name: swissphoto-landing
+    image: nginx:alpine
+    volumes:
+      - ../landingpage:/usr/share/nginx/html:ro
+    restart: always
+    networks:
+      - swissphoto-shared
+    labels:
+      - "traefik.enable=true"
+      # Hauptdomain: arturferreira.tech + www
+      - "traefik.http.routers.landing.rule=Host(`arturferreira.tech`) || Host(`www.arturferreira.tech`) || Host(`photos.arturferreira.tech`)"
+      - "traefik.http.routers.landing.entrypoints=websecure"
+      - "traefik.http.routers.landing.tls.certresolver=letsencrypt"
+      - "traefik.http.services.landing.loadbalancer.server.port=80"
+
+networks:
+  swissphoto-shared:
+    name: swissphoto-shared
+    driver: bridge
+
+volumes:
+  traefik-certs:
+  ml-cache:
