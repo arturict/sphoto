@@ -308,6 +308,30 @@ const auth = (req, res, next) => {
   next();
 };
 
+// =============================================================================
+// Checkout Session (proper Stripe integration)
+// =============================================================================
+app.get('/checkout/:plan', async (req, res) => {
+  const plan = req.params.plan;
+  const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_BASIC;
+  
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `https://${DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `https://${DOMAIN}`,
+      customer_email: req.query.email || undefined,
+    });
+    
+    res.redirect(303, session.url);
+  } catch (err) {
+    console.error('Checkout error:', err);
+    res.status(500).send('Checkout failed');
+  }
+});
+
 app.get('/health', (_, res) => res.json({ status: 'ok', domain: DOMAIN }));
 
 app.get('/api/instances', auth, (_, res) => {
