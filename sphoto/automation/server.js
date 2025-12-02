@@ -17,6 +17,9 @@ const PLANS = {
   [process.env.STRIPE_PRICE_PRO]: { name: 'Pro', storage: 1000 },
 };
 
+// Store checkout session status (in-memory, resets on restart)
+const sessionStatus = new Map();
+
 // Stripe webhook needs raw body
 app.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 app.use(express.json());
@@ -41,6 +44,11 @@ async function handleWebhook(req, res) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
+        const sessionId = session.id;
+        
+        // Mark as processing
+        sessionStatus.set(sessionId, { status: 'processing', message: 'Erstelle deine Cloud...' });
+        
         if (session.mode === 'subscription' && session.customer_email) {
           const sub = await stripe.subscriptions.retrieve(session.subscription);
           const priceId = sub.items.data[0].price.id;
@@ -48,11 +56,30 @@ async function handleWebhook(req, res) {
           
           if (plan) {
             const id = generateId(session.customer_email);
+            
+            sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
             await createInstance(id, session.customer_email, plan);
+            
             await stripe.customers.update(session.customer, {
               metadata: { sphoto_id: id }
             });
+            
+            sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
             await sendWelcomeEmail(session.customer_email, id, plan.name);
+            
+            // Mark as complete with instance URL
+            sessionStatus.set(sessionId, { 
+              status: 'complete', 
+              instanceId: id,
+              instanceUrl: `https://${id}.${DOMAIN}`,
+              email: session.customer_email,
+              plan: plan.name
+            });
+            
+            console.log(`Instance ${id} created for ${session.customer_email}`);
+          } else {
+            sessionStatus.set(sessionId, { status: 'error', message: 'Plan nicht erkannt. Bitte kontaktiere den Support.' });
+            console.error(`Unknown price ID: ${priceId}`);
           }
         }
         break;
@@ -320,7 +347,7 @@ app.get('/checkout/:plan', async (req, res) => {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `https://${DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `https://${DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://${DOMAIN}`,
       customer_email: req.query.email || undefined,
     });
@@ -329,6 +356,28 @@ app.get('/checkout/:plan', async (req, res) => {
   } catch (err) {
     console.error('Checkout error:', err);
     res.status(500).send('Checkout failed');
+  }
+});
+
+// Status endpoint for success page polling
+app.get('/status/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const status = sessionStatus.get(sessionId);
+  
+  if (status) {
+    res.json(status);
+  } else {
+    // Check if session exists in Stripe
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === 'paid') {
+        res.json({ status: 'processing', message: 'Zahlung erhalten, erstelle Cloud...' });
+      } else {
+        res.json({ status: 'pending', message: 'Warte auf Zahlung...' });
+      }
+    } catch {
+      res.json({ status: 'unknown', message: 'Session nicht gefunden' });
+    }
   }
 });
 
