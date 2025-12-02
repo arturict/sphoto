@@ -48,14 +48,14 @@
 
   let showNavigationLoadingBar = $state(false);
 
-  const getMyImmichLink = () => {
-    return new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
+  const getMySwissPhotoLink = () => {
+    return new URL(page.url.pathname + page.url.search, 'https://swissphoto.ch');
   };
 
   onMount(() => {
     const element = document.querySelector('#stencil');
     element?.remove();
-    // if the browser theme changes, changes the Immich theme too
+    // if the browser theme changes, changes the SwissPhoto theme too
   });
 
   eventManager.emit('AppInit');
@@ -175,7 +175,7 @@
 <CommandPaletteContext {commands} />
 
 <svelte:head>
-  <title>{page.data.meta?.title || 'Web'} - Immich</title>
+  <title>{page.data.meta?.title || 'Web'} - SwissPhoto</title>
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
   <meta name="theme-color" content="currentColor" />
   <AppleHeader />
@@ -216,7 +216,7 @@
 <svelte:document
   use:shortcut={{
     shortcut: { ctrl: true, shift: true, key: 'm' },
-    onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
+    onShortcut: () => copyToClipboard(getMySwissPhotoLink().toString()),
   }}
 />
 

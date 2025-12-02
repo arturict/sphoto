@@ -389,6 +389,12 @@ export const langs: Lang[] = [
   { name: 'Development (keys only)', code: 'dev', loader: () => Promise.resolve({ default: {} }) },
 ];
 
+export enum SwissPhotoProduct {
+  Client = 'swissphoto-client',
+  Server = 'swissphoto-server',
+}
+
+// Keep for compatibility with upstream
 export enum ImmichProduct {
   Client = 'immich-client',
   Server = 'immich-server',
