@@ -95,6 +95,8 @@ services:
     build: ./stats
     container_name: sphoto-stats
     environment:
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASS=${ADMIN_PASS}
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
     volumes:

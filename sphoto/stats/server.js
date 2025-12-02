@@ -11,6 +11,31 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const INSTANCES_DIR = '/data/instances';
 
 // =============================================================================
+// Basic Auth Middleware
+// =============================================================================
+const basicAuth = (req, res, next) => {
+  const auth = req.headers.authorization;
+  
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="SPhoto Admin"');
+    return res.status(401).send('Authentication required');
+  }
+  
+  const credentials = Buffer.from(auth.slice(6), 'base64').toString();
+  const [user, pass] = credentials.split(':');
+  
+  if (user === process.env.ADMIN_USER && pass === process.env.ADMIN_PASS) {
+    return next();
+  }
+  
+  res.setHeader('WWW-Authenticate', 'Basic realm="SPhoto Admin"');
+  return res.status(401).send('Invalid credentials');
+};
+
+// Apply auth to all routes
+app.use(basicAuth);
+
+// =============================================================================
 // Stats API
 // =============================================================================
 async function getStats() {

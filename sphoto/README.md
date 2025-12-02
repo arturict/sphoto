@@ -37,19 +37,34 @@ nano .env
 ```
 
 **Pflichtfelder in `.env`:**
+
 ```bash
-# Stripe (von stripe.com/dashboard)
+# =============================================================================
+# 🔐 ADMIN LOGIN (für admin.* und stats.* URLs)
+# =============================================================================
+ADMIN_USER=admin
+ADMIN_PASS=dein_sicheres_passwort
+
+# Traefik Auth Hash generieren:
+docker run --rm httpd:alpine htpasswd -nb admin dein_sicheres_passwort
+# Output kopieren (z.B. admin:$apr1$xyz...)
+TRAEFIK_AUTH=admin:$apr1$HIER_DEN_HASH
+
+# API Key für curl/Scripts:
+ADMIN_API_KEY=$(openssl rand -hex 32)
+
+# =============================================================================
+# 💳 Stripe (von stripe.com/dashboard)
+# =============================================================================
 STRIPE_SECRET_KEY=sk_live_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 STRIPE_PRICE_BASIC=price_xxx      # 200GB, CHF 5
 STRIPE_PRICE_PRO=price_xxx        # 1TB, CHF 15
 
-# Resend (von resend.com)
+# =============================================================================
+# 📧 Resend (von resend.com)
+# =============================================================================
 RESEND_API_KEY=re_xxx
-
-# Admin
-ADMIN_API_KEY=$(openssl rand -hex 32)
-TRAEFIK_AUTH=$(htpasswd -nb admin DEIN_PASSWORT)
 ```
 
 ### 3. Stripe einrichten
