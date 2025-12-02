@@ -81,6 +81,31 @@
       <p class="text-gray-400">Keine versteckten Kosten. Jederzeit kündbar.</p>
     </div>
     
+    <!-- Subdomain Selection -->
+    <div class="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 mb-8">
+      <label class="block text-sm font-medium text-gray-300 mb-2">Wähle deine Subdomain</label>
+      <div class="flex gap-2">
+        <div class="flex-1 relative">
+          <input 
+            type="text" 
+            id="subdomain-input"
+            placeholder="deinname"
+            class="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition"
+            pattern="[a-z0-9-]{3,20}"
+            oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9-]/g, '')"
+          >
+          <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">.sphoto.arturf.ch</span>
+        </div>
+        <button 
+          onclick="checkSubdomain()"
+          class="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition"
+        >
+          Prüfen
+        </button>
+      </div>
+      <p id="subdomain-status" class="mt-2 text-sm"></p>
+    </div>
+    
     <div class="grid md:grid-cols-2 gap-6">
       <!-- Basic -->
       <div class="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-8 card-glow transition-all duration-300">
@@ -108,9 +133,9 @@
             Mobile App (iOS/Android)
           </li>
         </ul>
-        <a href="https://api.sphoto.arturf.ch/checkout/basic" class="block text-center py-3 rounded-xl bg-white/10 hover:bg-white/20 font-medium transition">
-          Basic wählen
-        </a>
+        <button onclick="checkout('basic')" id="basic-btn" class="w-full block text-center py-3 rounded-xl bg-white/10 hover:bg-white/20 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Subdomain wählen ↑
+        </button>
       </div>
 
       <!-- Pro -->
@@ -138,9 +163,9 @@
             Priority Support
           </li>
         </ul>
-        <a href="https://api.sphoto.arturf.ch/checkout/pro" class="block text-center py-3 rounded-xl bg-red-500 hover:bg-red-600 font-medium transition">
-          Pro wählen
-        </a>
+        <button onclick="checkout('pro')" id="pro-btn" class="w-full block text-center py-3 rounded-xl bg-red-500 hover:bg-red-600 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Subdomain wählen ↑
+        </button>
       </div>
     </div>
 
@@ -189,6 +214,78 @@
       <div>© 2025 sphoto.arturf.ch</div>
     </div>
   </footer>
+
+  <script>
+    const API_URL = 'https://api.sphoto.arturf.ch';
+    let validSubdomain = null;
+    
+    const input = document.getElementById('subdomain-input');
+    const status = document.getElementById('subdomain-status');
+    const basicBtn = document.getElementById('basic-btn');
+    const proBtn = document.getElementById('pro-btn');
+    
+    // Auto-check on typing (debounced)
+    let timeout;
+    input.addEventListener('input', () => {
+      clearTimeout(timeout);
+      validSubdomain = null;
+      updateButtons();
+      status.textContent = '';
+      timeout = setTimeout(checkSubdomain, 500);
+    });
+    
+    async function checkSubdomain() {
+      const subdomain = input.value.trim().toLowerCase();
+      
+      if (subdomain.length < 3) {
+        status.textContent = 'Mindestens 3 Zeichen';
+        status.className = 'mt-2 text-sm text-yellow-400';
+        validSubdomain = null;
+        updateButtons();
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/subdomain/check/${subdomain}`);
+        const data = await res.json();
+        
+        if (data.available) {
+          status.innerHTML = `✓ <strong>${subdomain}</strong>.sphoto.arturf.ch ist verfügbar!`;
+          status.className = 'mt-2 text-sm text-green-400';
+          validSubdomain = subdomain;
+        } else {
+          status.textContent = `✗ ${data.reason}`;
+          status.className = 'mt-2 text-sm text-red-400';
+          validSubdomain = null;
+        }
+      } catch (err) {
+        status.textContent = 'Fehler beim Prüfen. Versuche es erneut.';
+        status.className = 'mt-2 text-sm text-red-400';
+        validSubdomain = null;
+      }
+      
+      updateButtons();
+    }
+    
+    function updateButtons() {
+      const enabled = validSubdomain !== null;
+      basicBtn.disabled = !enabled;
+      proBtn.disabled = !enabled;
+      
+      if (enabled) {
+        basicBtn.textContent = 'Basic wählen';
+        proBtn.textContent = 'Pro wählen';
+      } else {
+        basicBtn.textContent = 'Subdomain wählen ↑';
+        proBtn.textContent = 'Subdomain wählen ↑';
+      }
+    }
+    
+    function checkout(plan) {
+      if (!validSubdomain) return;
+      window.location.href = `${API_URL}/checkout/${plan}?subdomain=${validSubdomain}`;
+    }
+  </script>
 
 </body>
 </html>

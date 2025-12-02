@@ -80,7 +80,9 @@ async function handleWebhook(req, res) {
           console.log(`Plan found: ${plan ? plan.name : 'NOT FOUND'}`);
           
           if (plan) {
-            const id = generateId(customerEmail);
+            // Use custom subdomain from metadata or generate one
+            const customSubdomain = session.metadata?.subdomain;
+            const id = customSubdomain || generateId(customerEmail);
             
             console.log(`Creating instance ${id} for ${customerEmail}`);
             sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
@@ -215,8 +217,8 @@ async function setupImmichAdmin(instanceUrl, email, password, quotaBytes) {
 
     const { accessToken } = await loginResponse.json();
 
-    // Set storage quota if specified
-    if (quotaBytes && adminUser.id) {
+    // Set storage quota and force password change
+    if (adminUser.id) {
       const updateResponse = await fetch(`${instanceUrl}/api/admin/users/${adminUser.id}`, {
         method: 'PUT',
         headers: {
@@ -225,13 +227,14 @@ async function setupImmichAdmin(instanceUrl, email, password, quotaBytes) {
         },
         body: JSON.stringify({
           quotaSizeInBytes: quotaBytes,
+          shouldChangePassword: true,
         }),
       });
 
       if (updateResponse.ok) {
-        console.log(`Storage quota set to ${quotaBytes} bytes`);
+        console.log(`Storage quota set to ${quotaBytes} bytes, password change required`);
       } else {
-        console.error('Failed to set storage quota');
+        console.error('Failed to update user settings');
       }
     }
 
@@ -501,11 +504,64 @@ const auth = (req, res, next) => {
 };
 
 // =============================================================================
+// Subdomain API
+// =============================================================================
+const RESERVED_SUBDOMAINS = ['www', 'api', 'admin', 'stats', 'mail', 'smtp', 'ftp', 'ssh', 'test', 'dev', 'staging', 'app'];
+
+function isValidSubdomain(subdomain) {
+  // Only lowercase letters, numbers, hyphens, 3-20 chars, no leading/trailing hyphens
+  const regex = /^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$/;
+  return regex.test(subdomain) && !subdomain.includes('--');
+}
+
+app.get('/subdomain/check/:subdomain', (req, res) => {
+  const subdomain = req.params.subdomain.toLowerCase();
+  
+  // Validate format
+  if (!isValidSubdomain(subdomain)) {
+    return res.json({ 
+      available: false, 
+      reason: 'Ungültiges Format. 3-20 Zeichen, nur Kleinbuchstaben, Zahlen und Bindestriche.' 
+    });
+  }
+  
+  // Check reserved
+  if (RESERVED_SUBDOMAINS.includes(subdomain)) {
+    return res.json({ available: false, reason: 'Diese Subdomain ist reserviert.' });
+  }
+  
+  // Check if already exists
+  const instances = listInstances();
+  const exists = instances.some(i => i.id === subdomain);
+  
+  if (exists) {
+    return res.json({ available: false, reason: 'Diese Subdomain ist bereits vergeben.' });
+  }
+  
+  res.json({ available: true, subdomain });
+});
+
+// =============================================================================
 // Checkout Session (proper Stripe integration)
 // =============================================================================
 app.get('/checkout/:plan', async (req, res) => {
   const plan = req.params.plan;
+  const subdomain = req.query.subdomain?.toLowerCase();
   const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_BASIC;
+  
+  // Validate subdomain if provided
+  if (subdomain) {
+    if (!isValidSubdomain(subdomain)) {
+      return res.status(400).send('Ungültige Subdomain');
+    }
+    if (RESERVED_SUBDOMAINS.includes(subdomain)) {
+      return res.status(400).send('Subdomain reserviert');
+    }
+    const instances = listInstances();
+    if (instances.some(i => i.id === subdomain)) {
+      return res.status(400).send('Subdomain bereits vergeben');
+    }
+  }
   
   try {
     const session = await stripe.checkout.sessions.create({
@@ -514,6 +570,7 @@ app.get('/checkout/:plan', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `https://${DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://${DOMAIN}`,
+      metadata: subdomain ? { subdomain } : {},
     });
     
     res.redirect(303, session.url);
