@@ -1,133 +1,174 @@
-<p align="center"> 
-  <br/>
-  <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
-  <a href="https://discord.immich.app">
-    <img src="https://img.shields.io/discord/979116623879368755.svg?label=Discord&logo=Discord&style=for-the-badge&logoColor=000000&labelColor=ececec" alt="Discord"/>
-  </a>
-  <br/>
-  <br/>
+<p align="center">
+  <h1 align="center">📸 SPhoto</h1>
+  <h3 align="center">Managed Photo Cloud Platform</h3>
+  <p align="center">
+    <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=for-the-badge" alt="License: AGPLv3"></a>
+    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+    <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
+  </p>
 </p>
+
+---
+
+SPhoto is a **managed multi-tenant photo cloud platform** built on top of [Immich](https://immich.app). It provides automated instance provisioning, Stripe billing integration, and a modern admin dashboard.
+
+## ✨ Features
+
+- **🚀 Automated Instance Provisioning** - New customers get their own isolated Immich instance within seconds
+- **💳 Stripe Integration** - Subscription billing with automatic plan detection (Basic/Pro)
+- **🔐 Auto User Setup** - Admin accounts created automatically with secure passwords
+- **📧 Email Notifications** - Welcome emails via Resend with login credentials
+- **🎛️ Admin Dashboard** - Manage all instances, start/stop/delete with one click
+- **🌐 Custom Subdomains** - Each customer gets `username.yourdomain.com`
+- **📊 Storage Quotas** - Automatic quota enforcement per plan (200GB Basic / 2TB Pro)
+- **🔒 SSL/TLS** - Automatic Let's Encrypt certificates via Traefik
+- **🤖 Shared ML** - Single machine learning container for all instances
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Traefik (Reverse Proxy)                  │
+│                    SSL Termination + Routing                     │
+└─────────────────────────────────────────────────────────────────┘
+           │              │              │              │
+           ▼              ▼              ▼              ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │   Web    │   │Automation│   │  Stats   │   │ Instance │
+    │ (Next.js)│   │  Server  │   │Dashboard │   │   1..n   │
+    └──────────┘   └──────────┘   └──────────┘   └──────────┘
+                         │                             │
+                         ▼                             ▼
+                   ┌──────────┐                 ┌──────────┐
+                   │  Stripe  │                 │Shared ML │
+                   │ Webhooks │                 │Container │
+                   └──────────┘                 └──────────┘
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Ubuntu 22.04+ Server
+- Docker & Docker Compose
+- Domain with wildcard DNS (`*.yourdomain.com`)
+- Stripe Account (Test or Live)
+- Resend Account (for emails)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/arturict/sphoto.git
+cd sphoto/sphoto
+
+# Copy and configure environment
+cp .env.example .env
+nano .env
+
+# Start the platform
+docker compose up -d
+
+# Check logs
+docker compose logs -f automation
+```
+
+### Environment Variables
+
+```env
+# Domain
+DOMAIN=sphoto.yourdomain.com
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_BASIC=price_...
+STRIPE_PRICE_PRO=price_...
+
+# Resend (Email)
+RESEND_API_KEY=re_...
+EMAIL_FROM=SPhoto <noreply@yourdomain.com>
+
+# Admin
+ADMIN_USER=admin
+ADMIN_PASS=your-secure-password
+ADMIN_API_KEY=your-api-key
+```
+
+### Stripe Setup
+
+1. Create two Products in Stripe Dashboard:
+   - **Basic** - Monthly subscription (e.g., CHF 5/month)
+   - **Pro** - Monthly subscription (e.g., CHF 15/month)
+2. Copy the Price IDs to `.env`
+3. Create a Webhook endpoint: `https://api.yourdomain.com/webhook`
+4. Subscribe to events: `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`
+
+## 📁 Project Structure
+
+```
+sphoto/
+├── automation/          # Automation server (TypeScript/Bun)
+│   ├── src/
+│   │   ├── index.ts    # Main server
+│   │   ├── stripe.ts   # Stripe webhook handlers
+│   │   ├── instance.ts # Instance management
+│   │   └── email.ts    # Email templates
+│   └── Dockerfile
+├── web/                 # Web frontend (Next.js + shadcn/ui)
+│   ├── src/app/
+│   │   ├── page.tsx    # Landing page
+│   │   ├── admin/      # Admin dashboard
+│   │   └── success/    # Post-checkout page
+│   └── Dockerfile
+├── stats/              # Stats dashboard
+├── templates/          # Instance docker-compose template
+├── docker-compose.yml  # Main orchestration
+└── .env.example
+```
+
+## 🎯 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/checkout/:plan` | GET | Create Stripe checkout session |
+| `/webhook` | POST | Stripe webhook handler |
+| `/status/:sessionId` | GET | Check provisioning status |
+| `/health` | GET | Health check |
+| `/api/instances` | GET | List all instances (Admin) |
+| `/api/instances/:id` | DELETE | Delete instance (Admin) |
+| `/api/instances/:id/stop` | POST | Stop instance (Admin) |
+| `/api/instances/:id/start` | POST | Start instance (Admin) |
+
+## 🔧 Admin Dashboard
+
+Access the admin dashboard at `https://yourdomain.com/admin`
+
+Features:
+- View all instances with status
+- Start/Stop/Delete instances
+- See storage usage per instance
+- Quick links to each instance
+
+## 📱 Mobile App
+
+Users can use the official **Immich** mobile app:
+1. Download from [App Store](https://apps.apple.com/app/immich/id1613945652) or [Play Store](https://play.google.com/store/apps/details?id=app.alextran.immich)
+2. Enter server URL: `https://username.yourdomain.com`
+3. Login with credentials from welcome email
+
+## 🤝 Credits
+
+- [Immich](https://immich.app) - The amazing open-source photo platform this is built on
+- [Traefik](https://traefik.io) - Cloud-native reverse proxy
+- [shadcn/ui](https://ui.shadcn.com) - Beautiful UI components
+
+## 📄 License
+
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 <p align="center">
-<img src="design/immich-logo-stacked-light.svg" width="300" title="Login With Custom URL">
+  Built with ❤️ by <a href="https://github.com/arturict">arturict</a>
 </p>
-<h3 align="center">High performance self-hosted photo and video management solution</h3>
-<br/>
-<a href="https://immich.app">
-<img src="design/immich-screenshots.png" title="Main Screenshot">
-</a>
-<br/>
-
-<p align="center">
-  <a href="readme_i18n/README_ca_ES.md">Català</a>
-  <a href="readme_i18n/README_es_ES.md">Español</a>
-  <a href="readme_i18n/README_fr_FR.md">Français</a>
-  <a href="readme_i18n/README_it_IT.md">Italiano</a>
-  <a href="readme_i18n/README_ja_JP.md">日本語</a>
-  <a href="readme_i18n/README_ko_KR.md">한국어</a>
-  <a href="readme_i18n/README_de_DE.md">Deutsch</a>
-  <a href="readme_i18n/README_nl_NL.md">Nederlands</a>
-  <a href="readme_i18n/README_tr_TR.md">Türkçe</a>
-  <a href="readme_i18n/README_zh_CN.md">简体中文</a>
-  <a href="readme_i18n/README_zh_TW.md">正體中文</a>
-  <a href="readme_i18n/README_uk_UA.md">Українська</a>
-  <a href="readme_i18n/README_ru_RU.md">Русский</a>
-  <a href="readme_i18n/README_pt_BR.md">Português Brasileiro</a>
-  <a href="readme_i18n/README_sv_SE.md">Svenska</a>
-  <a href="readme_i18n/README_ar_JO.md">العربية</a>
-  <a href="readme_i18n/README_vi_VN.md">Tiếng Việt</a>
-  <a href="readme_i18n/README_th_TH.md">ภาษาไทย</a>
-</p>
-
-
-> [!WARNING]
-> ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
-> 
- 
-
-> [!NOTE]
-> You can find the main documentation, including installation guides, at https://immich.app/.
-
-## Links
-
-- [Documentation](https://docs.immich.app/)
-- [About](https://docs.immich.app/overview/introduction)
-- [Installation](https://docs.immich.app/install/requirements)
-- [Roadmap](https://immich.app/roadmap)
-- [Demo](#demo)
-- [Features](#features)
-- [Translations](https://docs.immich.app/developer/translations)
-- [Contributing](https://docs.immich.app/overview/support-the-project)
-
-## Demo
-
-Access the demo [here](https://demo.immich.app). For the mobile app, you can use `https://demo.immich.app` for the `Server Endpoint URL`.
-
-### Login credentials
-
-| Email           | Password |
-| --------------- | -------- |
-| demo@immich.app | demo     |
-
-## Features
-
-| Features                                     | Mobile | Web |
-| :------------------------------------------- | ------ | --- |
-| Upload and view videos and photos            | Yes    | Yes |
-| Auto backup when the app is opened           | Yes    | N/A |
-| Prevent duplication of assets                | Yes    | Yes |
-| Selective album(s) for backup                | Yes    | N/A |
-| Download photos and videos to local device   | Yes    | Yes |
-| Multi-user support                           | Yes    | Yes |
-| Album and Shared albums                      | Yes    | Yes |
-| Scrubbable/draggable scrollbar               | Yes    | Yes |
-| Support raw formats                          | Yes    | Yes |
-| Metadata view (EXIF, map)                    | Yes    | Yes |
-| Search by metadata, objects, faces, and CLIP | Yes    | Yes |
-| Administrative functions (user management)   | No     | Yes |
-| Background backup                            | Yes    | N/A |
-| Virtual scroll                               | Yes    | Yes |
-| OAuth support                                | Yes    | Yes |
-| API Keys                                     | N/A    | Yes |
-| LivePhoto/MotionPhoto backup and playback    | Yes    | Yes |
-| Support 360 degree image display             | No     | Yes |
-| User-defined storage structure               | Yes    | Yes |
-| Public Sharing                               | Yes    | Yes |
-| Archive and Favorites                        | Yes    | Yes |
-| Global Map                                   | Yes    | Yes |
-| Partner Sharing                              | Yes    | Yes |
-| Facial recognition and clustering            | Yes    | Yes |
-| Memories (x years ago)                       | Yes    | Yes |
-| Offline support                              | Yes    | No  |
-| Read-only gallery                            | Yes    | Yes |
-| Stacked Photos                               | Yes    | Yes |
-| Tags                                         | No     | Yes |
-| Folder View                                  | Yes    | Yes |
-
-## Translations
-
-Read more about translations [here](https://docs.immich.app/developer/translations).
-
-<a href="https://hosted.weblate.org/engage/immich/">
-<img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
-</a>
-
-## Repository activity
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
-## Star history
-
-<a href="https://star-history.com/#immich-app/immich&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=date" width="100%" />
- </picture>
-</a>
-
-## Contributors
-
-<a href="https://github.com/immich-app/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
