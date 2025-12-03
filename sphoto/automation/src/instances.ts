@@ -315,3 +315,35 @@ export function getInstance(id: string): InstanceMetadata | null {
   if (!existsSync(metaPath)) return null;
   return JSON.parse(readFileSync(metaPath, 'utf-8'));
 }
+
+export async function getDirectorySize(dirPath: string): Promise<number> {
+  const { stat, readdir } = await import('fs/promises');
+  
+  let totalSize = 0;
+  
+  async function walkDir(currentPath: string): Promise<void> {
+    try {
+      const entries = await readdir(currentPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const fullPath = join(currentPath, entry.name);
+        
+        if (entry.isDirectory()) {
+          await walkDir(fullPath);
+        } else if (entry.isFile()) {
+          try {
+            const stats = await stat(fullPath);
+            totalSize += stats.size;
+          } catch {
+            // Skip files we can't access
+          }
+        }
+      }
+    } catch {
+      // Skip directories we can't access
+    }
+  }
+  
+  await walkDir(dirPath);
+  return totalSize;
+}

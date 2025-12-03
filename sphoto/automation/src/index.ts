@@ -203,44 +203,41 @@ app.post('/api/instances/:id/generate-api-key', adminAuth, async (req: Request, 
 });
 
 // =============================================================================
-// Instance Statistics (proxy to Immich API)
+// Instance Statistics (via filesystem - no API key needed)
 // =============================================================================
 app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Response) => {
   try {
     const instanceId = req.params.id;
+    const { existsSync } = await import('fs');
+    const { join } = await import('path');
+    const { EXTERNAL_STORAGE_PATH, INSTANCES_DIR } = await import('./config');
+    const { getDirectorySize } = await import('./instances');
     
-    // First try to get the stored API key from metadata
-    let instanceApiKey = req.headers['x-immich-api-key'] as string;
-    
-    if (!instanceApiKey) {
-      // Try to get from stored metadata
-      const { existsSync, readFileSync } = await import('fs');
-      const { join } = await import('path');
-      const metaPath = join('/data/instances', instanceId, 'metadata.json');
-      
-      if (existsSync(metaPath)) {
-        const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
-        if (meta.immichApiKey) {
-          instanceApiKey = meta.immichApiKey;
-        }
-      }
+    // Determine upload path
+    let uploadsPath: string;
+    if (EXTERNAL_STORAGE_PATH) {
+      uploadsPath = join(EXTERNAL_STORAGE_PATH, instanceId, 'uploads');
+    } else {
+      uploadsPath = join(INSTANCES_DIR, instanceId, 'uploads');
     }
     
-    if (!instanceApiKey) {
-      return res.status(400).json({ error: 'No API key available for this instance' });
+    if (!existsSync(uploadsPath)) {
+      return res.json({ 
+        usage: 0, 
+        photos: 0, 
+        videos: 0,
+        usageByUser: [] 
+      });
     }
-
-    const instanceUrl = `https://${instanceId}.${env.DOMAIN}`;
-    const response = await fetch(`${instanceUrl}/api/server/statistics`, {
-      headers: { 'x-api-key': instanceApiKey },
+    
+    const usage = await getDirectorySize(uploadsPath);
+    
+    res.json({ 
+      usage, 
+      photos: 0, // Can't determine without API
+      videos: 0, // Can't determine without API
+      usageByUser: [] 
     });
-
-    if (!response.ok) {
-      throw new Error(`Immich API error: ${response.status}`);
-    }
-
-    const stats = await response.json();
-    res.json(stats);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

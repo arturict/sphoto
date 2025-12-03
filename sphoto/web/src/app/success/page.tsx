@@ -19,6 +19,49 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
 
+function getEmailProvider(email: string): "gmail" | "outlook" | "other" {
+  const domain = email.split("@")[1]?.toLowerCase() || ""
+  if (domain === "gmail.com" || domain === "googlemail.com") return "gmail"
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.de", "hotmail.de"].includes(domain)) return "outlook"
+  return "other"
+}
+
+function EmailLink({ email }: { email: string }) {
+  const provider = getEmailProvider(email)
+  
+  if (provider === "gmail") {
+    return (
+      <Button variant="outline" size="sm" asChild>
+        <a
+          href="https://mail.google.com/mail/u/0/#inbox"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Mail className="mr-2 h-4 w-4" />
+          Gmail öffnen
+        </a>
+      </Button>
+    )
+  }
+  
+  if (provider === "outlook") {
+    return (
+      <Button variant="outline" size="sm" asChild>
+        <a
+          href="https://outlook.live.com/mail/0/inbox"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Mail className="mr-2 h-4 w-4" />
+          Outlook öffnen
+        </a>
+      </Button>
+    )
+  }
+  
+  return null
+}
+
 interface SessionStatus {
   status: "processing" | "complete" | "error" | "pending" | "unknown"
   message?: string
@@ -200,6 +243,11 @@ function SuccessContent() {
               <p className="text-sm text-muted-foreground">
                 Deine Login-Daten wurden an <span className="font-mono">{status.email}</span> gesendet.
               </p>
+              {status.email && (
+                <div className="mt-2">
+                  <EmailLink email={status.email} />
+                </div>
+              )}
             </div>
           </div>
 

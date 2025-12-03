@@ -162,7 +162,7 @@ function StorageUsageCell({
           const err = await res.json().catch(() => ({ error: 'Unknown error' }))
           setErrorMsg(err.error || `Error ${res.status}`)
         }
-      } catch (e) {
+      } catch {
         setErrorMsg('Network error')
       } finally {
         setLoading(false)
@@ -184,7 +184,7 @@ function StorageUsageCell({
         <span className="text-muted-foreground">{storageQuota} GB</span>
         {errorMsg && (
           <span className="block text-amber-600 truncate max-w-24" title={errorMsg}>
-            {errorMsg.includes('No API key') ? 'Kein API Key' : 'Fehler'}
+            Fehler
           </span>
         )}
       </div>
@@ -207,9 +207,6 @@ function StorageUsageCell({
           className={`h-full rounded-full transition-all ${isHigh ? "bg-amber-500" : "bg-primary"}`}
           style={{ width: `${Math.min(usagePercent, 100)}%` }}
         />
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {stats.photos} Fotos · {stats.videos} Videos
       </div>
     </div>
   )
