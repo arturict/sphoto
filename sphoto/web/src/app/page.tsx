@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,52 +15,60 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   ArrowRight,
-  ArrowUpRight,
   Check,
   CheckCircle,
   Cloud,
   Cpu,
   Database,
   Globe,
+  Heart,
   Loader2,
+  Lock,
+  Map,
+  Search,
+  Shield,
   ShieldCheck,
   Smartphone,
   Sparkles,
-  Users2,
+  Upload,
+  Users,
   XCircle,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
 
-const heroHighlights = [
-  { label: "Aktive Silos", value: "180+", description: "Familien nutzen SPhoto täglich" },
-  { label: "Uptime", value: "99.9%", description: "Traefik + Healthchecks" },
-  { label: "Hosting", value: "🇨🇭 Zürich & Luzern", description: "ISO 27001 zertifiziert" },
-]
-
-const differentiators = [
+const features = [
   {
-    title: "Zero-Ads & Zero-Tracking",
-    description: "Kein Datenverkauf, kein KI-Training mit deinen Erinnerungen.",
     icon: ShieldCheck,
+    title: "Erstklassige Gesichtserkennung",
+    description: "Finde Bilder deiner Liebsten schnell und privat. KI-Technologie, die deine Privatsphäre respektiert.",
   },
   {
-    title: "Eigenes Subdomain-Silo",
-    description: "Jede Installation läuft isoliert mit eigenen Datenbanken.",
-    icon: Globe,
-  },
-  {
-    title: "Sofortiger Upload von Handy & Desktop",
-    description: "Immich-Apps für iOS, Android, macOS, Windows und Linux.",
     icon: Smartphone,
+    title: "iPhone & Android Apps",
+    description: "Sofortige Backups deiner Fotos vom Handy in die Cloud. Unterstützt die nativen Immich-Apps.",
   },
-]
-
-const steps = [
-  { badge: "Schritt 1", title: "Subdomain wählen", description: "Name prüfen und Reservierung abschicken." },
-  { badge: "Schritt 2", title: "Plan auswählen", description: "5 CHF Basic oder 15 CHF Pro – monatlich kündbar." },
-  { badge: "Schritt 3", title: "Automatisch deployt", description: "In ~2 Minuten läuft dein persönlicher Immich-Stack." },
+  {
+    icon: Lock,
+    title: "Deine Daten gehören dir",
+    description: "Verschlüsselt gespeichert in der Schweiz. Kein Tracking, keine Werbung, kein KI-Training mit deinen Bildern.",
+  },
+  {
+    icon: Map,
+    title: "Fotos auf der Weltkarte",
+    description: "Sieh wo deine Erinnerungen entstanden sind. GPS-Daten werden sicher und privat verarbeitet.",
+  },
+  {
+    icon: Search,
+    title: "Intelligente Suche",
+    description: "Finde Fotos nach Personen, Objekten, Orten oder Datum. KI-gestützte Objekterkennung inklusive.",
+  },
+  {
+    icon: Users,
+    title: "Teile mit Familie & Freunden",
+    description: "Lade weitere Nutzer ein. Erstelle geteilte Alben und verwalte Zugriffsrechte.",
+  },
 ]
 
 const planDetails = [
@@ -68,93 +77,73 @@ const planDetails = [
     name: "Basic",
     price: "5",
     storage: "200 GB",
-    badge: "Budget",
-    description: "Für Einzelpersonen",
-    accent: "border-muted",
-    features: [
-      "200 GB Speicher",
-      "Mobile Apps & Auto-Upload",
-      "KI-Suche & Gesichtserkennung",
-      "E-Mail Support innerhalb 24h",
-    ],
+    popular: false,
+    description: "Perfekt für Einzelpersonen",
   },
   {
     id: "pro",
     name: "Pro",
     price: "15",
     storage: "1 TB",
-    badge: "Beliebt",
-    description: "Für Familien & Teams",
-    accent: "border-primary",
-    features: [
-      "1 TB Speicher",
-      "5 Nutzer inkl. Familienfreigaben",
-      "Priorisierter Support (4h)",
-      "Erweiterbar + eigene Domain",
-    ],
+    popular: true,
+    description: "Ideal für Familien & Teams",
   },
 ]
 
-const testimonials = [
-  {
-    quote:
-      "Wir haben 12 Jahre Familienfotos zu SPhoto migriert. Die Geschwindigkeit der Immich-Apps ist besser als bei Google Photos und endlich bleiben die Daten in der Schweiz.",
-    author: "Sandra & Joel",
-    role: "Zürich",
-  },
-  {
-    quote:
-      "Für mein Hochzeitsstudio wollte ich eine private Ablage, die Kunden-Logins unterstützt. Mit den Mandanten-Silos kann ich jedes Paar separieren – mega.",
-    author: "Nora",
-    role: "Fotografin aus Luzern",
-  },
+const allFeatures = [
+  "Keine Werbung oder Tracking",
+  "Gesichtserkennung mit Privatsphäre",
+  "KI-Objekterkennung",
+  "Weitere Nutzer einladen",
+  "Erweiterte Duplikaterkennung",
+  "Sichere & private Speicherung",
+  "Gehostet in der Schweiz 🇨🇭",
+  "Keine Upload-Limits",
+  "Voller API-Zugang",
+  "Fotos archivieren",
+  "Support durch echte Menschen",
+  "Verschlüsselt gespeichert",
+  "Fotos auf der Weltkarte",
+  "Teilen mit wem du willst",
+  "Detaillierte Bildsuche",
 ]
 
 const faqs = [
   {
     q: "Was ist Immich?",
-    a: "Immich ist eine Open-Source Foto-Cloud. Wir betreiben und warten sie für dich inklusive Updates, Backups und Sicherheits-Patches.",
+    a: "Immich ist eine führende Open-Source Foto-Cloud mit aktiver Community und tausenden Nutzern. Wir hosten und warten es für dich – inklusive Updates und Sicherheits-Patches.",
+  },
+  {
+    q: "Kann ich von Google Photos wechseln?",
+    a: "Ja! Wir haben eine detaillierte Anleitung zum Migrieren deiner Fotos von Google Photos. Alle Metadaten und Alben bleiben erhalten.",
+  },
+  {
+    q: "Wie sicher sind meine Daten?",
+    a: "Jede Instanz läuft isoliert mit eigenen Datenbanken und Secrets. Deine Daten sind verschlüsselt und werden ausschliesslich in der Schweiz gespeichert.",
   },
   {
     q: "Kann ich meine Fotos exportieren?",
-    a: "Ja. Vollständige Exporte via Web oder CLI sind jederzeit möglich und kostenfrei.",
+    a: "Ja, jederzeit. Vollständige Exporte via Web oder CLI sind kostenfrei möglich. Deine Daten gehören dir – für immer.",
   },
   {
     q: "Wie läuft die Abrechnung?",
-    a: "Stripe bucht monatlich ab. Kündigung jederzeit möglich – dein Silo bleibt bis zum Laufzeitende online.",
+    a: "Monatliche Abrechnung via Stripe. Kündigung jederzeit möglich – deine Instanz bleibt bis zum Laufzeitende online.",
   },
   {
-    q: "Sind meine Daten wirklich privat?",
-    a: "Jedes Silo erhält eigene Container, Datenbanken, Secrets und Backups. Kein Teammitglied sieht deine Inhalte.",
+    q: "Gibt es eine kostenlose Testversion?",
+    a: "Aktuell bieten wir keine kostenlose Version an, aber du kannst jederzeit innerhalb von 14 Tagen kündigen und erhältst dein Geld zurück.",
   },
 ]
-
-const featureGrid = [
-  { title: "Unbegrenzte Uploads", description: "Volle Qualität, keine Kompression, kein Limit pro Tag.", icon: Cloud },
-  { title: "Dedizierte Datenbank", description: "Postgres + Valkey je Instanz – kein Shared Schema.", icon: Database },
-  { title: "ML-Funktionen", description: "Face Clustering, Objekterkennung, Duplikat-Prüfung.", icon: Cpu },
-  { title: "Teamzugriff", description: "Geteilte Alben, Rollen & gerätebasierte Freigaben.", icon: Users2 },
-]
-
-const statusClasses: Record<string, string> = {
-  idle: "bg-muted text-muted-foreground",
-  checking: "bg-amber-100 text-amber-700",
-  available: "bg-green-100 text-green-700",
-  taken: "bg-red-100 text-red-600",
-  invalid: "bg-red-100 text-red-600",
-}
 
 export default function Home() {
   const [subdomain, setSubdomain] = useState("")
   const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle")
   const [statusMessage, setStatusMessage] = useState("")
-  const [lastChecked, setLastChecked] = useState<Date | null>(null)
 
   useEffect(() => {
     if (!subdomain) {
       setSubdomainStatus("idle")
       setStatusMessage("")
-      setLastChecked(null)
       return
     }
 
@@ -175,9 +164,8 @@ export default function Home() {
           setStatusMessage(`${subdomain}.${DOMAIN} ist verfügbar`)
         } else {
           setSubdomainStatus("taken")
-          setStatusMessage(data?.reason || "Bereits reserviert")
+          setStatusMessage(data?.reason || "Bereits vergeben")
         }
-        setLastChecked(new Date())
       } catch (error) {
         if ((error as DOMException)?.name === "AbortError") return
         setSubdomainStatus("invalid")
@@ -193,8 +181,6 @@ export default function Home() {
 
   const checkoutDisabled = subdomainStatus !== "available"
   const subdomainUrl = useMemo(() => (subdomain ? `${subdomain}.${DOMAIN}` : ""), [subdomain])
-  const lastCheckedLabel = lastChecked?.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })
-  const statusBadgeClass = statusClasses[subdomainStatus] ?? statusClasses.idle
 
   const renderStatusIcon = () => {
     if (subdomainStatus === "checking") return <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
@@ -209,301 +195,338 @@ export default function Home() {
   }
 
   return (
-    <div className="bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2 text-xl font-bold">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <span>
-              <span className="text-primary">S</span>Photo
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Button variant="ghost" asChild>
-              <a href="#features">Features</a>
-            </Button>
-            <Button variant="ghost" asChild>
-              <a href="#pricing">Preise</a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/admin">Dashboard</a>
-            </Button>
-          </div>
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <span><span className="text-primary">S</span>Photo</span>
+          </Link>
+          <nav className="hidden items-center gap-6 text-sm md:flex">
+            <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</Link>
+            <Link href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Preise</Link>
+            <Link href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</Link>
+            <Link href="/migrate/google-photos" className="text-muted-foreground hover:text-foreground transition-colors">Migration</Link>
+          </nav>
+          <Button asChild>
+            <a href="#pricing">Jetzt starten</a>
+          </Button>
         </div>
       </header>
 
-      <main className="relative">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-primary/5 via-background to-background" aria-hidden />
-
-        <section className="container mx-auto grid gap-12 px-4 py-16 lg:grid-cols-[1.2fr,0.8fr]">
-          <div>
-            <Badge variant="secondary" className="mb-5 w-fit">
-              Schweizer Immich Hosting
-            </Badge>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-              Deine Fotos.
-              <br />
-              <span className="text-primary">Deine private Cloud.</span>
-            </h1>
-            <p className="mt-6 text-lg text-muted-foreground md:text-xl">
-              SPhoto betreibt Immich für dich – inklusive Updates, Backups, Monitoring und Schweizer Support. Starte mit
-              einer eigenen Subdomain und eigener Infrastruktur in unter 3 Minuten.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" asChild>
-                <a href="#pricing">
-                  Jetzt starten
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <a href="#faq">
-                  Mehr erfahren
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
+      <main>
+        {/* Hero Section */}
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-primary/5 via-background to-background" />
+          <div className="container mx-auto px-4 py-20 md:py-32">
+            <div className="mx-auto max-w-4xl text-center">
+              <Badge variant="secondary" className="mb-6">
+                🇨🇭 Gehostet in der Schweiz
+              </Badge>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                Befreie deine Fotos von
+                <span className="block text-primary">amerikanischen Tech-Plattformen</span>
+              </h1>
+              <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
+                Privatsphäre und Sicherheit sind keine Option. Speichere deine Erinnerungen auf Schweizer Boden – 
+                mit KI-Funktionen, die deine Daten respektieren.
+              </p>
+              <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                <Button size="lg" className="h-12 px-8 text-base" asChild>
+                  <a href="#pricing">
+                    Kostenlos starten
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </a>
+                </Button>
+                <Button size="lg" variant="outline" className="h-12 px-8 text-base" asChild>
+                  <Link href="/migrate/google-photos">
+                    Von Google Photos wechseln
+                  </Link>
+                </Button>
+              </div>
             </div>
-            <div className="mt-10 grid gap-6 sm:grid-cols-3">
-              {heroHighlights.map((item) => (
-                <Card key={item.label} className="bg-card/70 shadow-sm">
-                  <CardContent className="pt-6">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                    <p className="text-2xl font-semibold">{item.value}</p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section id="features" className="border-t bg-muted/30 py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold md:text-4xl">Alles was du brauchst</h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Modernste Technologie, maximale Privatsphäre
+              </p>
+            </div>
+            <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((feature) => (
+                <Card key={feature.title} className="border-0 bg-background shadow-lg">
+                  <CardHeader>
+                    <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                      <feature.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground">{feature.description}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
-
-          <Card className="border-primary/40 bg-card/80 shadow-xl backdrop-blur">
-            <CardHeader>
-              <CardTitle>Subdomain reservieren</CardTitle>
-              <CardDescription>Jede Instanz läuft isoliert unter eigener URL.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="text-sm font-medium text-muted-foreground" htmlFor="subdomain-input">
-                Wunsch-URL
-              </label>
-              <div className="relative">
-                <Input
-                  id="subdomain-input"
-                  value={subdomain}
-                  placeholder="deinname"
-                  onChange={(event) => setSubdomain(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                  className="pr-28 text-base"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
-                  .{DOMAIN}
-                </span>
-              </div>
-              {subdomain && (
-                <p className="text-xs text-muted-foreground">https://{subdomainUrl}</p>
-              )}
-              {subdomain && (
-                <div className="flex items-center gap-2 text-sm">
-                  {renderStatusIcon()}
-                  <span className="font-medium">{statusMessage}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className={`${statusBadgeClass} border-0 px-3 py-1 font-medium capitalize`}>
-                  {subdomainStatus === "idle" ? "bereit" : subdomainStatus}
-                </Badge>
-                {lastCheckedLabel && <span>zuletzt geprüft {lastCheckedLabel} Uhr</span>}
-              </div>
-            </CardContent>
-            <CardFooter className="flex-col gap-3">
-              <p className="text-sm text-muted-foreground">Weiter unten kannst du deinen Plan auswählen.</p>
-              <div className="grid w-full gap-2 sm:grid-cols-2">
-                <Button variant="outline" disabled={checkoutDisabled} onClick={() => handleCheckout("basic")}>
-                  Basic (5 CHF)
-                </Button>
-                <Button disabled={checkoutDisabled} onClick={() => handleCheckout("pro")}>
-                  Pro (15 CHF)
-                </Button>
-              </div>
-              {checkoutDisabled && subdomain.length < 3 && (
-                <span className="text-xs text-muted-foreground">Mindestens 3 Zeichen, nur a-z und -</span>
-              )}
-            </CardFooter>
-          </Card>
         </section>
 
-        <section id="features" className="container mx-auto grid gap-8 px-4 py-16 lg:grid-cols-2">
-          <div className="space-y-4">
-            <Badge variant="secondary" className="w-fit">
-              Warum SPhoto?
-            </Badge>
-            <h2 className="text-3xl font-semibold">Volle Kontrolle über deine Erinnerungen</h2>
-            <p className="text-lg text-muted-foreground">
-              Wir kombinieren die Stärke von Immich mit einem durchdachten Hosting-Setup: isolierte Container, automatisierte
-              Backups und Monitoring – managed wie ein modernes SaaS, aber zu deinem Preis.
-            </p>
-            <div className="space-y-5">
-              {differentiators.map((item) => (
-                <div key={item.title} className="flex gap-4 rounded-xl border p-4 shadow-sm">
-                  <item.icon className="h-10 w-10 text-primary" />
-                  <div>
-                    <p className="text-lg font-semibold">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {featureGrid.map((feature) => (
-              <Card key={feature.title} className="bg-card/70">
-                <CardContent className="flex flex-col gap-3 pt-6">
-                  <feature.icon className="h-8 w-8 text-primary" />
-                  <div>
-                    <p className="text-lg font-semibold">{feature.title}</p>
-                    <p className="text-sm text-muted-foreground">{feature.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section className="container mx-auto px-4 py-12">
-          <div className="rounded-2xl border bg-card p-8 shadow-lg">
-            <div className="grid gap-6 md:grid-cols-3">
-              {steps.map((step) => (
-                <div key={step.title} className="space-y-2">
-                  <Badge variant="outline" className="uppercase tracking-tight">
-                    {step.badge}
-                  </Badge>
-                  <p className="text-xl font-semibold">{step.title}</p>
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="container mx-auto px-4 py-16">
-          <div className="flex flex-col items-center text-center">
-            <Badge variant="secondary" className="mb-4">
-              Preise
-            </Badge>
-            <h2 className="text-3xl font-semibold">Einfaches Preismodell – monatlich kündbar</h2>
-            <p className="mt-3 max-w-2xl text-lg text-muted-foreground">
-              Keine Setup-Kosten, keine versteckten Gebühren. Sobald du kündigst, exportierst du deine Fotos mit wenigen Klicks.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {planDetails.map((plan) => (
-              <Card key={plan.id} className={`${plan.accent} ${plan.id === "pro" ? "shadow-xl" : ""}`}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <Badge variant={plan.id === "pro" ? "default" : "secondary"}>{plan.badge}</Badge>
-                    <span className="text-sm text-muted-foreground">{plan.description}</span>
-                  </div>
-                  <CardTitle className="text-4xl">
-                    {plan.price} CHF
-                    <span className="text-sm font-normal text-muted-foreground"> / Monat</span>
-                  </CardTitle>
-                  <CardDescription>{plan.storage} Speicher</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3 text-sm">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2">
-                        <Check className="mt-0.5 h-4 w-4 text-green-500" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={plan.id === "pro" ? "default" : "outline"}
-                    disabled={checkoutDisabled}
-                    onClick={() => handleCheckout(plan.id as "basic" | "pro")}
-                  >
-                    {checkoutDisabled ? "Subdomain zuerst prüfen" : `Plan ${plan.name} sichern`}
+        {/* Phone Backup Section */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div>
+                <Badge variant="outline" className="mb-4">Mobile Apps</Badge>
+                <h2 className="text-3xl font-bold md:text-4xl">iPhone & Android Apps</h2>
+                <p className="mt-4 text-lg text-muted-foreground">
+                  SPhoto unterstützt die nativen Immich-Apps für sofortige Backups deiner Fotos vom Handy in die Cloud. 
+                  Basiert auf einer optimierten Version von Immich.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <span>Fotos auf dem Handy ansehen</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <span>Sofortige und sichere Backups</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <span>Erstklassiger Support für iPhone und Android</span>
+                  </li>
+                </ul>
+                <div className="mt-8 flex gap-4">
+                  <Button variant="outline" asChild>
+                    <a href="https://apps.apple.com/app/immich/id1613945652" target="_blank" rel="noreferrer">
+                      App Store
+                    </a>
                   </Button>
-                </CardFooter>
-              </Card>
-            ))}
+                  <Button variant="outline" asChild>
+                    <a href="https://play.google.com/store/apps/details?id=app.alextran.immich" target="_blank" rel="noreferrer">
+                      Google Play
+                    </a>
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-primary/5 blur-2xl" />
+                  <Card className="relative w-72 shadow-2xl">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
+                          <Upload className="h-5 w-5 text-primary-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">Auto-Backup aktiv</p>
+                          <p className="text-sm text-muted-foreground">1.247 Fotos gesichert</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <div className="h-2 rounded-full bg-muted">
+                          <div className="h-full w-3/4 rounded-full bg-primary" />
+                        </div>
+                        <p className="text-xs text-muted-foreground">150 GB von 200 GB verwendet</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            ⚠️ Budget-Service ohne sekundäre Offsite-Backups. Für geschäftskritische Daten empfehlen wir zusätzliche Sicherung.
-          </p>
         </section>
 
-        <section className="container mx-auto grid gap-6 px-4 py-16 lg:grid-cols-2">
-          {testimonials.map((item) => (
-            <Card key={item.author} className="bg-card/80">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-primary">
-                  <Sparkles className="h-4 w-4" />
-                  Erfahrungsbericht
+        {/* Pricing Section */}
+        <section id="pricing" className="border-t bg-muted/30 py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold md:text-4xl">Einfache, transparente Preise</h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Keine versteckten Gebühren. Monatlich kündbar.
+              </p>
+            </div>
+
+            {/* Subdomain Picker */}
+            <div className="mx-auto mt-12 max-w-md">
+              <Card className="border-primary/20 shadow-lg">
+                <CardHeader className="text-center">
+                  <CardTitle>Wähle deine Subdomain</CardTitle>
+                  <CardDescription>Jede Instanz läuft isoliert unter eigener URL</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="relative">
+                    <Input
+                      value={subdomain}
+                      placeholder="deinname"
+                      onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      className="pr-32 text-lg"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                      .{DOMAIN}
+                    </span>
+                  </div>
+                  {subdomain && (
+                    <div className="flex items-center gap-2 text-sm">
+                      {renderStatusIcon()}
+                      <span className={subdomainStatus === "available" ? "text-green-600" : subdomainStatus === "taken" || subdomainStatus === "invalid" ? "text-red-600" : ""}>
+                        {statusMessage}
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Pricing Cards */}
+            <div className="mx-auto mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
+              {planDetails.map((plan) => (
+                <Card key={plan.id} className={`relative ${plan.popular ? "border-primary shadow-xl" : ""}`}>
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge className="bg-primary">Beliebt</Badge>
+                    </div>
+                  )}
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    <CardDescription>{plan.description}</CardDescription>
+                    <div className="mt-4">
+                      <span className="text-5xl font-bold">{plan.price}</span>
+                      <span className="text-xl text-muted-foreground"> CHF/Monat</span>
+                    </div>
+                    <p className="mt-2 text-lg font-medium text-primary">{plan.storage} Speicher</p>
+                  </CardHeader>
+                  <CardFooter>
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      variant={plan.popular ? "default" : "outline"}
+                      disabled={checkoutDisabled}
+                      onClick={() => handleCheckout(plan.id as "basic" | "pro")}
+                    >
+                      {checkoutDisabled ? "Subdomain wählen" : `${plan.name} starten`}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+
+            {/* All Features */}
+            <div className="mx-auto mt-16 max-w-4xl">
+              <h3 className="mb-8 text-center text-xl font-semibold">Alle Pläne beinhalten</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {allFeatures.map((feature) => (
+                  <div key={feature} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-500 shrink-0" />
+                    <span className="text-sm">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Open Source Section */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-3xl text-center">
+              <Badge variant="outline" className="mb-4">Open Source</Badge>
+              <h2 className="text-3xl font-bold md:text-4xl">Basiert auf einer führenden Open-Source Plattform</h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Aufgebaut auf Immich – einem vertrauenswürdigen Open-Source Projekt mit einer lebendigen Community 
+                und tausenden aktiven Nutzern. Erlebe die Zuverlässigkeit und Innovation einer Plattform, 
+                die für moderne Fotospeicherung entwickelt wurde.
+              </p>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="font-semibold">Sicher & privat</p>
+                  <p className="text-sm text-muted-foreground">Verschlüsselte Speicherung</p>
                 </div>
-                <CardTitle className="text-xl font-semibold text-foreground">{item.author}</CardTitle>
-                <CardDescription>{item.role}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="leading-relaxed text-muted-foreground">“{item.quote}”</p>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="font-semibold">Aktive Community</p>
+                  <p className="text-sm text-muted-foreground">Tausende Nutzer weltweit</p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="font-semibold">Regelmässige Updates</p>
+                  <p className="text-sm text-muted-foreground">Ständige Verbesserungen</p>
+                </div>
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="font-semibold">Skalierbar</p>
+                  <p className="text-sm text-muted-foreground">Für privat & Business</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section id="faq" className="border-t bg-muted/30 py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold md:text-4xl">Häufig gestellte Fragen</h2>
+            </div>
+            <div className="mx-auto mt-12 max-w-3xl">
+              <div className="grid gap-4">
+                {faqs.map((faq) => (
+                  <Card key={faq.q}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{faq.q}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground">{faq.a}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <Card className="mx-auto max-w-4xl border-0 bg-primary text-primary-foreground">
+              <CardContent className="p-8 text-center md:p-12">
+                <h2 className="text-3xl font-bold md:text-4xl">Bereit für deine private Foto-Cloud?</h2>
+                <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
+                  Starte jetzt und sichere dir deine eigene Subdomain. Deine Instanz ist in unter 3 Minuten bereit.
+                </p>
+                <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+                  <Button size="lg" variant="secondary" className="h-12 px-8" asChild>
+                    <a href="#pricing">Jetzt starten</a>
+                  </Button>
+                  <Button size="lg" variant="outline" className="h-12 px-8 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10" asChild>
+                    <a href={`mailto:hello@${DOMAIN}`}>Kontakt aufnehmen</a>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          ))}
-        </section>
-
-        <section id="faq" className="container mx-auto px-4 py-16">
-          <div className="flex flex-col items-center text-center">
-            <Badge variant="secondary" className="mb-4">
-              FAQ
-            </Badge>
-            <h2 className="text-3xl font-semibold">Antworten auf die häufigsten Fragen</h2>
           </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            {faqs.map((item) => (
-              <Card key={item.q} className="bg-card/70">
-                <CardHeader>
-                  <CardTitle className="text-lg">{item.q}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.a}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section className="container mx-auto px-4 pb-20">
-          <Card className="border-primary/40 bg-primary text-primary-foreground">
-            <CardHeader>
-              <CardTitle>Bereit für eine private Foto-Cloud?</CardTitle>
-              <CardDescription className="text-primary-foreground/90">
-                Sichere dir jetzt eine Subdomain und lass dir deine Instanz automatisch deployen.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="gap-4">
-              <Button variant="secondary" asChild>
-                <a href="#pricing">Plan wählen</a>
-              </Button>
-              <Button variant="outline" className="text-primary-foreground" asChild>
-                <a href={`mailto:hello@${DOMAIN}`}>Kontakt aufnehmen</a>
-              </Button>
-            </CardFooter>
-          </Card>
         </section>
       </main>
 
-      <footer className="border-t bg-background/90">
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-muted-foreground">
-          <div>
-            <span className="text-primary font-semibold">SPhoto</span> · Basiert auf Immich · Betrieben in der Schweiz
-          </div>
-          <div className="flex gap-4">
-            <a href="/admin" className="hover:text-foreground">
-              Admin
-            </a>
-            <span>© {new Date().getFullYear()} {DOMAIN}</span>
+      {/* Footer */}
+      <footer className="border-t py-12">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="font-bold"><span className="text-primary">S</span>Photo</span>
+            </div>
+            <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+              <Link href="/migrate/google-photos" className="hover:text-foreground">Migration</Link>
+              <Link href="#faq" className="hover:text-foreground">FAQ</Link>
+              <Link href="/admin" className="hover:text-foreground">Admin</Link>
+              <a href={`mailto:hello@${DOMAIN}`} className="hover:text-foreground">Kontakt</a>
+            </nav>
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} SPhoto · Basiert auf Immich · 🇨🇭 Schweiz
+            </p>
           </div>
         </div>
       </footer>
