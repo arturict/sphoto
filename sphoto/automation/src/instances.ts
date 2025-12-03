@@ -172,14 +172,34 @@ export async function setupNextcloudAdmin(
   adminUser: string,
   adminPass: string,
   email: string, 
-  quotaGB: number
+  quotaGB: number,
+  containerId?: string
 ): Promise<{ success: boolean }> {
   try {
-    // Create admin user via OCS API
-    // First we need to wait for Nextcloud to be fully installed
-    // The admin credentials are set via environment variables during container creation
+    // Wait extra time for Nextcloud to fully initialize after status.php is ready
+    console.log('Waiting 15s for Nextcloud to fully initialize...');
+    await new Promise(resolve => setTimeout(resolve, 15000));
     
-    // Update the user's email and quota
+    // Try using OCC command via docker exec (more reliable)
+    if (containerId) {
+      try {
+        const quotaBytes = BigInt(quotaGB) * BigInt(1024) * BigInt(1024) * BigInt(1024);
+        
+        // Set quota via occ
+        await execAsync(`docker exec -u www-data ${containerId} php occ user:setting ${adminUser} files quota "${quotaBytes.toString()}"`);
+        console.log(`Nextcloud quota set via OCC: ${quotaGB} GB (${quotaBytes} bytes)`);
+        
+        // Set email via occ  
+        await execAsync(`docker exec -u www-data ${containerId} php occ user:setting ${adminUser} settings email "${email}"`);
+        console.log(`Nextcloud email set via OCC: ${email}`);
+        
+        return { success: true };
+      } catch (occErr) {
+        console.error('OCC command failed, falling back to API:', occErr);
+      }
+    }
+    
+    // Fallback: Use OCS REST API
     const authHeader = 'Basic ' + Buffer.from(`${adminUser}:${adminPass}`).toString('base64');
     
     // Set email
@@ -194,11 +214,12 @@ export async function setupNextcloudAdmin(
     });
     
     if (!emailRes.ok) {
-      console.error('Failed to set Nextcloud email');
+      const errText = await emailRes.text().catch(() => '');
+      console.error(`Failed to set Nextcloud email: ${emailRes.status} - ${errText}`);
     }
     
-    // Set quota - Nextcloud OCS API requires bytes as a number string
-    const quotaBytes = quotaGB * 1024 * 1024 * 1024; // Convert GB to bytes
+    // Set quota - use BigInt to handle large numbers safely, then convert to string
+    const quotaBytes = BigInt(quotaGB) * BigInt(1024) * BigInt(1024) * BigInt(1024);
     const quotaRes = await fetch(`${instanceUrl}/ocs/v1.php/cloud/users/${adminUser}`, {
       method: 'PUT',
       headers: {
@@ -206,14 +227,14 @@ export async function setupNextcloudAdmin(
         'Authorization': authHeader,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `key=quota&value=${quotaBytes}`,
+      body: `key=quota&value=${quotaBytes.toString()}`,
     });
     
     if (!quotaRes.ok) {
       const errorText = await quotaRes.text().catch(() => 'unknown');
-      console.error(`Failed to set Nextcloud quota: ${quotaRes.status} - ${errorText}`);
+      console.error(`Failed to set Nextcloud quota via API: ${quotaRes.status} - ${errorText}`);
     } else {
-      console.log(`Nextcloud quota set to ${quotaGB} GB (${quotaBytes} bytes)`);
+      console.log(`Nextcloud quota set via API: ${quotaGB} GB (${quotaBytes} bytes)`);
     }
     
     console.log(`Nextcloud admin user configured: ${adminUser}`);
@@ -432,9 +453,10 @@ export async function createInstance(
   
   if (platform === 'nextcloud') {
     const isReady = await waitForNextcloud(instanceUrl);
+    const containerId = `${id}-app`; // Nextcloud app container name
     
     if (isReady) {
-      const setupResult = await setupNextcloudAdmin(instanceUrl, adminUser, userPassword, email, plan.storage);
+      const setupResult = await setupNextcloudAdmin(instanceUrl, adminUser, userPassword, email, plan.storage, containerId);
       if (setupResult.success) {
         const metaPath = join(dir, 'metadata.json');
         const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
