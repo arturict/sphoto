@@ -48,7 +48,18 @@ docker compose down
 # SSH into VM, then run:
 cd /opt/sphoto/sphoto
 git pull
+
+# Full rebuild (recommended after major changes):
+docker compose down
+docker compose up -d --build
+
+# Quick update (specific services only):
 docker compose up -d --build automation web
+
+# If old containers are still running, force remove:
+docker ps -a | grep sphoto
+docker compose down --remove-orphans
+docker compose up -d --build
 
 # Run automation server locally (requires Bun)
 cd automation
