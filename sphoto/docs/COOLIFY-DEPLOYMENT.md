@@ -2,6 +2,18 @@
 
 Diese Anleitung erklärt, wie du SPhoto auf einer Coolify-VM deployen kannst, wobei Coolify's integrierter Traefik Reverse-Proxy für SSL-Zertifikate und Routing genutzt wird.
 
+## ⚡ Quick Update Command
+
+```bash
+cd /opt/sphoto/sphoto
+git pull
+docker compose up -d --build
+```
+
+**Diesen Befehl für alle Updates verwenden!**
+
+---
+
 ## Übersicht
 
 ### Unterschiede zum Standalone-Deployment
@@ -346,6 +358,40 @@ for dir in /data/instances/*/; do
   docker compose down
   docker compose up -d
 done
+```
+
+## Updates
+
+### ⚡ Standard Update (wichtig!)
+
+```bash
+cd /opt/sphoto/sphoto
+git pull
+docker compose up -d --build
+```
+
+**Diesen Befehl für alle Updates verwenden!** Er:
+1. Wechselt ins richtige Verzeichnis
+2. Holt die neuesten Änderungen von GitHub
+3. Baut nur geänderte Container neu und startet sie
+
+### Nach grösseren Updates
+
+Falls neue Environment Variablen hinzugefügt wurden:
+```bash
+cd /opt/sphoto/sphoto
+git pull
+# .env prüfen/anpassen
+nano .env
+docker compose down
+docker compose up -d --build
+```
+
+### Nur bestimmte Services neu bauen
+
+```bash
+cd /opt/sphoto/sphoto
+docker compose up -d --build automation web
 ```
 
 ## Support
