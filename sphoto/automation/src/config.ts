@@ -14,6 +14,7 @@ export const env: Env = {
   EMAIL_FROM: process.env.EMAIL_FROM || 'SPhoto <noreply@arturf.ch>',
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || '',
   IMMICH_VERSION: process.env.IMMICH_VERSION || 'release',
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@arturf.ch',
 };
 
 export const INSTANCES_DIR = '/data/instances';

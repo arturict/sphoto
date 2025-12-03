@@ -272,17 +272,17 @@ export function cleanupOldStats(): void {
   }
 }
 
-// Run daily stats collection (called by cron or at startup)
+// Run stats collection (called by scheduler or at startup)
 export async function runDailyStatsCollection(): Promise<void> {
-  console.log('Starting daily stats collection...');
+  console.log('Starting stats collection...');
   
   try {
     const stats = await collectDailyStats();
     saveDailyStats(stats);
-    console.log(`Daily stats collected: ${Object.keys(stats.instances).length} instances`);
+    console.log(`Stats collected: ${Object.keys(stats.instances).length} instances`);
     
     cleanupOldStats();
   } catch (err) {
-    console.error('Failed to collect daily stats:', err);
+    console.error('Failed to collect stats:', err);
   }
 }

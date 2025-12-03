@@ -11,6 +11,38 @@ import { getBranding, updateBranding, deleteBranding, generateCustomCss } from '
 import { startExport, getExportJob, getExportByToken, listExportJobs, cleanupExpiredExports } from './export';
 import { getAnalytics, runDailyStatsCollection } from './analytics';
 import { sendExportReadyEmail } from './email';
+import { 
+  getAlertHistory, 
+  updateAlertSettings, 
+  checkInstanceAlerts, 
+  runAlertCheck, 
+  sendTestAlert, 
+  getActiveAlerts,
+  type AlertType 
+} from './alerts';
+import {
+  getPlanInfo,
+  checkDowngradePossible,
+  upgradePlan,
+  downgradePlan,
+} from './plan-migration';
+import {
+  listMaintenances,
+  getMaintenance,
+  createMaintenance,
+  updateMaintenance,
+  cancelMaintenance,
+  startMaintenance,
+  completeMaintenance,
+  getPublicStatus,
+  checkMaintenanceNotifications,
+  type MaintenanceCreateInput,
+} from './maintenance';
+import {
+  runHealthCheck,
+  getHealthSummary,
+  getInstanceHealth,
+} from './health';
 import type { BrandingSettings } from './types';
 
 const app = express();
@@ -393,6 +425,235 @@ app.post('/api/analytics/collect', adminAuth, async (_req: Request, res: Respons
 });
 
 // =============================================================================
+// Alerts API
+// =============================================================================
+app.get('/api/instances/:id/alerts', adminAuth, (req: Request, res: Response) => {
+  try {
+    const history = getAlertHistory(req.params.id);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put('/api/instances/:id/alerts/settings', adminAuth, (req: Request, res: Response) => {
+  try {
+    const history = updateAlertSettings(req.params.id, req.body);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/alerts/test/:id', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const alertType = req.body.type as AlertType;
+    const adminEmail = req.body.adminEmail || env.EMAIL_FROM.replace(/.*<(.*)>/, '$1');
+    await sendTestAlert(req.params.id, alertType, adminEmail);
+    res.json({ success: true });
+  } catch (err) {
+    if ((err as Error).message === 'Instance not found') {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/admin/alerts/summary', adminAuth, (_req: Request, res: Response) => {
+  try {
+    const alerts = getActiveAlerts();
+    res.json(alerts);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/alerts/check', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.body.adminEmail || env.EMAIL_FROM.replace(/.*<(.*)>/, '$1');
+    const alerts = await runAlertCheck(adminEmail);
+    res.json({ triggered: alerts.length, alerts });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Plan Migration API
+// =============================================================================
+app.get('/api/instances/:id/plan', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const info = await getPlanInfo(req.params.id);
+    if (!info) {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/instances/:id/plan/upgrade', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const { stripeCustomerId, stripeSubscriptionId } = req.body;
+    const result = await upgradePlan(req.params.id, stripeCustomerId, stripeSubscriptionId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/instances/:id/plan/downgrade', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const { stripeSubscriptionId } = req.body;
+    const result = await downgradePlan(req.params.id, stripeSubscriptionId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/instances/:id/plan/check', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await checkDowngradePossible(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Maintenance API
+// =============================================================================
+app.get('/api/admin/maintenance', adminAuth, (_req: Request, res: Response) => {
+  try {
+    const maintenances = listMaintenances();
+    res.json(maintenances);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/maintenance', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const input: MaintenanceCreateInput = req.body;
+    const maintenance = await createMaintenance(input);
+    res.status(201).json(maintenance);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/admin/maintenance/:id', adminAuth, (req: Request, res: Response) => {
+  try {
+    const maintenance = getMaintenance(req.params.id);
+    if (!maintenance) {
+      return res.status(404).json({ error: 'Maintenance not found' });
+    }
+    res.json(maintenance);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put('/api/admin/maintenance/:id', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const maintenance = await updateMaintenance(req.params.id, req.body);
+    if (!maintenance) {
+      return res.status(404).json({ error: 'Maintenance not found' });
+    }
+    res.json(maintenance);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.delete('/api/admin/maintenance/:id', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const maintenance = await cancelMaintenance(req.params.id);
+    if (!maintenance) {
+      return res.status(404).json({ error: 'Maintenance not found' });
+    }
+    res.json(maintenance);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/maintenance/:id/start', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const maintenance = await startMaintenance(req.params.id);
+    if (!maintenance) {
+      return res.status(404).json({ error: 'Maintenance not found' });
+    }
+    res.json(maintenance);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/maintenance/:id/complete', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const maintenance = await completeMaintenance(req.params.id);
+    if (!maintenance) {
+      return res.status(404).json({ error: 'Maintenance not found' });
+    }
+    res.json(maintenance);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// Public status endpoint (no auth required)
+app.get('/api/status', (_req: Request, res: Response) => {
+  try {
+    const status = getPublicStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Health Monitoring API
+// =============================================================================
+app.get('/api/admin/health', adminAuth, (_req: Request, res: Response) => {
+  try {
+    const summary = getHealthSummary();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/admin/health/:id', adminAuth, (req: Request, res: Response) => {
+  try {
+    const health = getInstanceHealth(req.params.id);
+    if (!health) {
+      return res.status(404).json({ error: 'Health status not found' });
+    }
+    res.json(health);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/admin/health/check', adminAuth, async (_req: Request, res: Response) => {
+  try {
+    const summary = await runHealthCheck();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
 // Start Server
 // =============================================================================
 const PORT = process.env.PORT || 3000;
@@ -403,22 +664,50 @@ cleanupExpiredExports().catch(console.error);
 // Run daily stats collection on startup
 runDailyStatsCollection().catch(console.error);
 
-// Schedule daily stats collection (runs at midnight)
-const scheduleDaily = () => {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  const msUntilMidnight = midnight.getTime() - now.getTime();
+// Check maintenance notifications on startup
+checkMaintenanceNotifications().catch(console.error);
+
+// Schedule stats collection (runs every 4 hours)
+const scheduleStatsCollection = () => {
+  // Run immediately
+  runDailyStatsCollection().catch(console.error);
   
-  setTimeout(() => {
+  // Then every 4 hours
+  setInterval(() => {
     runDailyStatsCollection().catch(console.error);
-    // Schedule next run in 24 hours
-    setInterval(() => {
-      runDailyStatsCollection().catch(console.error);
-    }, 24 * 60 * 60 * 1000);
-  }, msUntilMidnight);
+  }, 4 * 60 * 60 * 1000);
 };
-scheduleDaily();
+scheduleStatsCollection();
+
+// Schedule alert checks (every 6 hours)
+const scheduleAlertChecks = () => {
+  // Run immediately, then every 6 hours
+  runAlertCheck(env.ADMIN_EMAIL).catch(console.error);
+  
+  setInterval(() => {
+    runAlertCheck(env.ADMIN_EMAIL).catch(console.error);
+  }, 6 * 60 * 60 * 1000);
+};
+scheduleAlertChecks();
+
+// Schedule maintenance notification checks (every hour)
+setInterval(() => {
+  checkMaintenanceNotifications().catch(console.error);
+}, 60 * 60 * 1000);
+
+// Schedule health checks (every 15 minutes)
+const scheduleHealthChecks = () => {
+  // Run after 30 seconds (let instances start up)
+  setTimeout(() => {
+    runHealthCheck().catch(console.error);
+  }, 30000);
+  
+  // Then every 15 minutes
+  setInterval(() => {
+    runHealthCheck().catch(console.error);
+  }, 15 * 60 * 1000);
+};
+scheduleHealthChecks();
 
 app.listen(PORT, () => {
   console.log(`

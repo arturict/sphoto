@@ -9,6 +9,7 @@ import { env, PLANS } from './config';
 import { generateId, createInstance } from './instances';
 import { sendWelcomeEmail, sendPaymentFailedEmail } from './email';
 import { stopInstance } from './instances';
+import { handlePlanChange } from './plan-migration';
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
@@ -116,6 +117,18 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
         const customer = await stripe.customers.retrieve(sub.customer as string);
         if (!('deleted' in customer) && customer.metadata?.sphoto_id) {
           await stopInstance(customer.metadata.sphoto_id);
+        }
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        const customer = await stripe.customers.retrieve(sub.customer as string);
+        if (!('deleted' in customer) && customer.metadata?.sphoto_id) {
+          const newPriceId = sub.items.data[0]?.price.id;
+          if (newPriceId) {
+            await handlePlanChange(customer.metadata.sphoto_id, newPriceId);
+          }
         }
         break;
       }
