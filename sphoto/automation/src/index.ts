@@ -135,6 +135,74 @@ app.delete('/api/instances/:id', adminAuth, async (req: Request, res: Response) 
 });
 
 // =============================================================================
+// Generate API Key for existing instance (one-time setup)
+// =============================================================================
+app.post('/api/instances/:id/generate-api-key', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const instanceId = req.params.id;
+    const { existsSync, readFileSync, writeFileSync } = await import('fs');
+    const { join } = await import('path');
+    
+    const metaPath = join('/data/instances', instanceId, 'metadata.json');
+    if (!existsSync(metaPath)) {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    
+    const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+    
+    // Check if already has API key
+    if (meta.immichApiKey) {
+      return res.json({ success: true, message: 'API key already exists' });
+    }
+    
+    // Need email and password to login and create API key
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    const instanceUrl = `https://${instanceId}.${env.DOMAIN}`;
+    
+    // Login
+    const loginRes = await fetch(`${instanceUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (!loginRes.ok) {
+      return res.status(401).json({ error: 'Login failed' });
+    }
+    
+    const { accessToken } = await loginRes.json() as { accessToken: string };
+    
+    // Create API key
+    const apiKeyRes = await fetch(`${instanceUrl}/api/api-keys`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ name: 'SPhoto Admin Stats' }),
+    });
+    
+    if (!apiKeyRes.ok) {
+      return res.status(500).json({ error: 'Failed to create API key' });
+    }
+    
+    const { secret } = await apiKeyRes.json() as { secret: string };
+    
+    // Save to metadata
+    meta.immichApiKey = secret;
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    
+    res.json({ success: true, message: 'API key generated and saved' });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
 // Instance Statistics (proxy to Immich API)
 // =============================================================================
 app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Response) => {

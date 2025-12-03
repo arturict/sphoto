@@ -47,8 +47,14 @@ interface InstanceStats {
   photos: number
   videos: number
   usage: number
-  usagePhotos: number
-  usageVideos: number
+  usageByUser: Array<{
+    
+    
+    usage: number
+    photos: number
+    videos: number
+    quotaSizeInBytes: number | null
+  }>
 }
 
 type StatusFilter = "all" | Instance["status"]
@@ -137,12 +143,12 @@ function StorageUsageCell({
 }) {
   const [stats, setStats] = useState<InstanceStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true)
-      setError(false)
+      setErrorMsg(null)
       try {
         const res = await fetch(`${API_URL}/api/instances/${instanceId}/stats`, {
           headers: {
@@ -153,10 +159,11 @@ function StorageUsageCell({
           const data = await res.json()
           setStats(data)
         } else {
-          setError(true)
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+          setErrorMsg(err.error || `Error ${res.status}`)
         }
-      } catch {
-        setError(true)
+      } catch (e) {
+        setErrorMsg('Network error')
       } finally {
         setLoading(false)
       }
@@ -171,8 +178,17 @@ function StorageUsageCell({
     return <span className="text-muted-foreground text-xs animate-pulse">Laden...</span>
   }
 
-  if (error || !stats) {
-    return <span className="text-muted-foreground">{storageQuota} GB</span>
+  if (errorMsg || !stats) {
+    return (
+      <div className="text-xs">
+        <span className="text-muted-foreground">{storageQuota} GB</span>
+        {errorMsg && (
+          <span className="block text-amber-600 truncate max-w-24" title={errorMsg}>
+            {errorMsg.includes('No API key') ? 'Kein API Key' : 'Fehler'}
+          </span>
+        )}
+      </div>
+    )
   }
 
   const usagePercent = quotaBytes > 0 ? Math.round((stats.usage / quotaBytes) * 100) : 0
