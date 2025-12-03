@@ -11,6 +11,14 @@ export interface Plans {
   [priceId: string]: Plan;
 }
 
+export interface BrandingSettings {
+  logo_url?: string;
+  primary_color?: string;
+  welcome_message?: string;
+  favicon_url?: string;
+  app_name?: string;
+}
+
 export interface InstanceMetadata {
   id: string;
   email: string;
@@ -21,6 +29,19 @@ export interface InstanceMetadata {
   initialPassword?: string;
   stopped_at?: string;
   immichApiKey?: string;
+  branding?: BrandingSettings;
+}
+
+export interface ExportJob {
+  id: string;
+  instanceId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created: string;
+  completed?: string;
+  downloadToken?: string;
+  expiresAt?: string;
+  error?: string;
+  fileSize?: number;
 }
 
 export interface CreateInstanceResult {
@@ -81,4 +102,21 @@ export interface Env {
   EMAIL_FROM: string;
   ADMIN_API_KEY: string;
   IMMICH_VERSION: string;
+}
+
+export interface DailyStats {
+  date: string;
+  instances: Record<string, {
+    storage_bytes: number;
+    files: number;
+  }>;
+}
+
+export interface AnalyticsData {
+  uploadTrend: Array<{ date: string; uploads: number }>;
+  storageGrowth: Array<{ date: string; total_bytes: number }>;
+  activeInstances: number;
+  inactiveInstances: number;
+  topInstances: Array<{ id: string; storage_bytes: number; files: number }>;
+  churnRisk: Array<{ id: string; lastActivity: string }>;
 }

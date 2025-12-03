@@ -8,6 +8,11 @@ import { handleWebhook, getSessionStatus, createCheckoutSession } from './stripe
 import { checkSubdomain, isValidSubdomain } from './subdomain';
 import { listInstances, getInstance, startInstance, stopInstance, deleteInstance } from './instances';
 import { RESERVED_SUBDOMAINS } from './config';
+import { getBranding, updateBranding, deleteBranding, generateCustomCss } from './branding';
+import { startExport, getExportJob, getExportByToken, listExportJobs, cleanupExpiredExports } from './export';
+import { getAnalytics, runDailyStatsCollection } from './analytics';
+import { sendExportReadyEmail } from './email';
+import type { BrandingSettings } from './types';
 
 const app = express();
 
@@ -244,9 +249,177 @@ app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Respons
 });
 
 // =============================================================================
+// Branding API
+// =============================================================================
+app.get('/api/instances/:id/branding', adminAuth, (req: Request, res: Response) => {
+  try {
+    const branding = getBranding(req.params.id);
+    if (!branding) {
+      return res.json({});
+    }
+    res.json(branding);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put('/api/instances/:id/branding', adminAuth, (req: Request, res: Response) => {
+  try {
+    const branding = updateBranding(req.params.id, req.body as BrandingSettings);
+    res.json(branding);
+  } catch (err) {
+    if ((err as Error).message === 'Instance not found') {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.delete('/api/instances/:id/branding', adminAuth, (req: Request, res: Response) => {
+  try {
+    deleteBranding(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    if ((err as Error).message === 'Instance not found') {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Custom CSS endpoint for Immich injection
+app.get('/api/instances/:id/custom.css', (req: Request, res: Response) => {
+  try {
+    const branding = getBranding(req.params.id);
+    if (!branding) {
+      res.type('text/css').send('/* No custom branding */');
+      return;
+    }
+    const css = generateCustomCss(branding);
+    res.type('text/css').send(css);
+  } catch {
+    res.type('text/css').send('/* Error loading branding */');
+  }
+});
+
+// =============================================================================
+// Export API (DSGVO Data Export)
+// =============================================================================
+app.post('/api/instances/:id/export', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await startExport(req.params.id);
+    res.json(job);
+  } catch (err) {
+    if ((err as Error).message === 'Instance not found') {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/instances/:id/export/:jobId', adminAuth, (req: Request, res: Response) => {
+  const job = getExportJob(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Export job not found' });
+  }
+  if (job.instanceId !== req.params.id) {
+    return res.status(404).json({ error: 'Export job not found' });
+  }
+  res.json(job);
+});
+
+app.get('/api/instances/:id/exports', adminAuth, (req: Request, res: Response) => {
+  const jobs = listExportJobs(req.params.id);
+  res.json(jobs);
+});
+
+// Public download endpoint (token-based auth)
+app.get('/api/exports/:token', (req: Request, res: Response) => {
+  const result = getExportByToken(req.params.token);
+  if (!result) {
+    return res.status(404).json({ error: 'Export not found or expired' });
+  }
+  
+  const { job, filePath } = result;
+  res.download(filePath, `sphoto-export-${job.instanceId}.zip`);
+});
+
+// Notify user when export is ready (called after job completion)
+app.post('/api/instances/:id/export/:jobId/notify', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const job = getExportJob(req.params.jobId);
+    if (!job || job.instanceId !== req.params.id) {
+      return res.status(404).json({ error: 'Export job not found' });
+    }
+    
+    if (job.status !== 'completed' || !job.downloadToken) {
+      return res.status(400).json({ error: 'Export not ready' });
+    }
+    
+    const instance = getInstance(req.params.id);
+    if (!instance) {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    
+    const downloadUrl = `https://api.${env.DOMAIN}/api/exports/${job.downloadToken}`;
+    await sendExportReadyEmail(instance.email, instance.id, downloadUrl, job.fileSize || 0);
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Analytics API
+// =============================================================================
+app.get('/api/analytics', adminAuth, (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const analytics = getAnalytics(Math.min(days, 90)); // Max 90 days
+    res.json(analytics);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Manual trigger for stats collection (useful for testing)
+app.post('/api/analytics/collect', adminAuth, async (_req: Request, res: Response) => {
+  try {
+    await runDailyStatsCollection();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
 // Start Server
 // =============================================================================
 const PORT = process.env.PORT || 3000;
+
+// Cleanup expired exports on startup
+cleanupExpiredExports().catch(console.error);
+
+// Run daily stats collection on startup
+runDailyStatsCollection().catch(console.error);
+
+// Schedule daily stats collection (runs at midnight)
+const scheduleDaily = () => {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const msUntilMidnight = midnight.getTime() - now.getTime();
+  
+  setTimeout(() => {
+    runDailyStatsCollection().catch(console.error);
+    // Schedule next run in 24 hours
+    setInterval(() => {
+      runDailyStatsCollection().catch(console.error);
+    }, 24 * 60 * 60 * 1000);
+  }, msUntilMidnight);
+};
+scheduleDaily();
 
 app.listen(PORT, () => {
   console.log(`

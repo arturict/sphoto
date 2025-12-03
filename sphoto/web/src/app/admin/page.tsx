@@ -14,12 +14,15 @@ import { Input } from "@/components/ui/input"
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   CheckSquare,
   Clock4,
+  Download,
   ExternalLink,
   Filter,
   HardDrive,
   Mail,
+  Palette,
   Play,
   RefreshCw,
   Search,
@@ -29,6 +32,7 @@ import {
   SquareStack,
   Trash2,
 } from "lucide-react"
+import Link from "next/link"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
@@ -356,6 +360,34 @@ export default function AdminPage() {
     }
   }
 
+  const handleExport = async (id: string) => {
+    setActionLoading(id)
+    try {
+      const job = await api(`/api/instances/${id}/export`, "POST")
+      if (job?.id) {
+        // Poll for completion
+        const checkStatus = async () => {
+          const status = await api(`/api/instances/${id}/export/${job.id}`)
+          if (status.status === "completed") {
+            // Notify user via email
+            await api(`/api/instances/${id}/export/${job.id}/notify`, "POST")
+            alert(`Export fertig! E-Mail wurde an den Nutzer gesendet.`)
+          } else if (status.status === "failed") {
+            setError(`Export fehlgeschlagen: ${status.error}`)
+          } else {
+            // Still processing, check again
+            setTimeout(checkStatus, 3000)
+          }
+        }
+        setTimeout(checkStatus, 2000)
+      }
+    } catch {
+      // bereits behandelt
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleBulkAction = async (action: "stop" | "delete") => {
     if (selectedIds.size === 0) return
     setBulkLoading(true)
@@ -529,6 +561,18 @@ export default function AdminPage() {
             <p className="text-sm text-muted-foreground">Managed Immich Instanzen</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link href="/admin/branding">
+              <Button variant="outline" size="sm">
+                <Palette className="mr-2 h-4 w-4" />
+                Branding
+              </Button>
+            </Link>
+            <Link href="/admin/analytics">
+              <Button variant="outline" size="sm">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Analytics
+              </Button>
+            </Link>
             <Badge variant="secondary">{instances.length} Instanzen</Badge>
             {lastSync && (
               <span className="flex items-center gap-1 text-muted-foreground">
@@ -815,24 +859,35 @@ export default function AdminPage() {
                                 </Button>
                               )}
                               {!isDeleted && (
-                                deleteConfirm === instance.id ? (
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleAction(instance.id, "delete")}
-                                    disabled={actionLoading === instance.id}
-                                  >
-                                    Bestätigen
-                                  </Button>
-                                ) : (
+                                <>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setDeleteConfirm(instance.id)}
+                                    onClick={() => handleExport(instance.id)}
+                                    disabled={actionLoading === instance.id}
+                                    title="DSGVO Export"
                                   >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                    <Download className="h-4 w-4 text-blue-500" />
                                   </Button>
-                                )
+                                  {deleteConfirm === instance.id ? (
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleAction(instance.id, "delete")}
+                                      disabled={actionLoading === instance.id}
+                                    >
+                                      Bestätigen
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDeleteConfirm(instance.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
+                                </>
                               )}
                             </div>
                           </td>
