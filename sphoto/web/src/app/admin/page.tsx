@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Filter,
   HardDrive,
+  Key,
   Mail,
   Play,
   RefreshCw,
@@ -43,6 +44,14 @@ interface Instance {
   stopped_at?: string
 }
 
+interface InstanceStats {
+  photos: number
+  videos: number
+  usage: number
+  usagePhotos: number
+  usageVideos: number
+}
+
 type StatusFilter = "all" | Instance["status"]
 type PlanFilter = "all" | "Basic" | "Pro"
 
@@ -56,6 +65,14 @@ const statusLabel: Record<Instance["status"], string> = {
   active: "Aktiv",
   stopped: "Gestoppt",
   deleted: "Gelöscht",
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB", "TB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
 }
 
 function getEmailProvider(email: string): "gmail" | "outlook" | "other" {
@@ -110,6 +127,94 @@ function EmailButton({ email }: { email: string }) {
   )
 }
 
+function StorageUsageCell({ 
+  instanceId, 
+  storageQuota, 
+  apiKey,
+  immichApiKeys 
+}: { 
+  instanceId: string
+  storageQuota: number
+  apiKey: string
+  immichApiKeys: Record<string, string>
+}) {
+  const [stats, setStats] = useState<InstanceStats | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const immichKey = immichApiKeys[instanceId]
+
+  useEffect(() => {
+    if (!immichKey) return
+    
+    const fetchStats = async () => {
+      setLoading(true)
+      setError(false)
+      try {
+        const res = await fetch(`${API_URL}/api/instances/${instanceId}/stats`, {
+          headers: {
+            'x-api-key': apiKey,
+            'x-immich-api-key': immichKey,
+          },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setStats(data)
+        } else {
+          setError(true)
+        }
+      } catch {
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [instanceId, apiKey, immichKey])
+
+  const quotaBytes = storageQuota * 1024 * 1024 * 1024
+
+  if (!immichKey) {
+    return (
+      <span className="text-muted-foreground text-xs">
+        API Key fehlt
+      </span>
+    )
+  }
+
+  if (loading) {
+    return <span className="text-muted-foreground text-xs animate-pulse">Laden...</span>
+  }
+
+  if (error || !stats) {
+    return <span className="text-muted-foreground">{storageQuota} GB</span>
+  }
+
+  const usagePercent = quotaBytes > 0 ? Math.round((stats.usage / quotaBytes) * 100) : 0
+  const isHigh = usagePercent > 80
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className={isHigh ? "text-amber-600 font-medium" : ""}>
+          {formatBytes(stats.usage)}
+        </span>
+        <span className="text-muted-foreground">/ {storageQuota} GB</span>
+      </div>
+      <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div 
+          className={`h-full rounded-full transition-all ${isHigh ? "bg-amber-500" : "bg-primary"}`}
+          style={{ width: `${Math.min(usagePercent, 100)}%` }}
+        />
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {stats.photos} Fotos · {stats.videos} Videos
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const [apiKey, setApiKey] = useState("")
   const [isAuthed, setIsAuthed] = useState(false)
@@ -123,11 +228,26 @@ export default function AdminPage() {
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [immichApiKeys, setImmichApiKeys] = useState<Record<string, string>>({})
   const [filters, setFilters] = useState<{ query: string; status: StatusFilter; plan: PlanFilter }>({
     query: "",
     status: "all",
     plan: "all",
   })
+
+  // Load stored Immich API keys from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const keys: Record<string, string> = {}
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith("immich_api_key_")) {
+        const instanceId = key.replace("immich_api_key_", "")
+        keys[instanceId] = localStorage.getItem(key) || ""
+      }
+    }
+    setImmichApiKeys(keys)
+  }, [])
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("admin_api_key") : null
@@ -681,8 +801,19 @@ export default function AdminPage() {
                           <td className="py-3">
                             <Badge variant={instance.plan === "Pro" ? "default" : "secondary"}>{instance.plan}</Badge>
                           </td>
-                          <td className="py-3 text-muted-foreground">
-                            {numberFormatter.format(instance.storage_gb || 0)} GB
+                          <td className="py-3">
+                            {instance.status === "active" ? (
+                              <StorageUsageCell
+                                instanceId={instance.id}
+                                storageQuota={instance.storage_gb}
+                                apiKey={apiKey}
+                                immichApiKeys={immichApiKeys}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">
+                                {numberFormatter.format(instance.storage_gb || 0)} GB
+                              </span>
+                            )}
                           </td>
                           <td className="py-3">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusPalette[instance.status]}`}>
@@ -702,6 +833,29 @@ export default function AdminPage() {
                                   {canStop ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const key = prompt(`Immich API Key für ${instance.id}:`, immichApiKeys[instance.id] || "")
+                                  if (key !== null) {
+                                    if (key) {
+                                      localStorage.setItem(`immich_api_key_${instance.id}`, key)
+                                      setImmichApiKeys(prev => ({ ...prev, [instance.id]: key }))
+                                    } else {
+                                      localStorage.removeItem(`immich_api_key_${instance.id}`)
+                                      setImmichApiKeys(prev => {
+                                        const next = { ...prev }
+                                        delete next[instance.id]
+                                        return next
+                                      })
+                                    }
+                                  }
+                                }}
+                                title={immichApiKeys[instance.id] ? "API Key ändern" : "API Key setzen"}
+                              >
+                                <Key className={`h-4 w-4 ${immichApiKeys[instance.id] ? "text-green-600" : "text-muted-foreground"}`} />
+                              </Button>
                               {!isDeleted && (
                                 deleteConfirm === instance.id ? (
                                   <Button

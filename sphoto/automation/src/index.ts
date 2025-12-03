@@ -135,6 +135,32 @@ app.delete('/api/instances/:id', adminAuth, async (req: Request, res: Response) 
 });
 
 // =============================================================================
+// Instance Statistics (proxy to Immich API)
+// =============================================================================
+app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const instanceApiKey = req.headers['x-immich-api-key'] as string;
+    if (!instanceApiKey) {
+      return res.status(400).json({ error: 'Missing x-immich-api-key header' });
+    }
+
+    const instanceUrl = `https://${req.params.id}.${env.DOMAIN}`;
+    const response = await fetch(`${instanceUrl}/api/server/statistics`, {
+      headers: { 'x-api-key': instanceApiKey },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Immich API error: ${response.status}`);
+    }
+
+    const stats = await response.json();
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
 // Start Server
 // =============================================================================
 const PORT = process.env.PORT || 3000;
