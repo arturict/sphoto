@@ -20,12 +20,10 @@ import {
   Cloud,
   Loader2,
   Lock,
-  Map,
   Search,
   ShieldCheck,
   Smartphone,
   Sparkles,
-  Upload,
   Users,
   XCircle,
   Camera,
@@ -68,33 +66,33 @@ const platformInfo = {
 const features = [
   {
     icon: ShieldCheck,
-    title: "Erstklassige Gesichtserkennung",
-    description: "Finde Bilder deiner Liebsten schnell und privat. KI-Technologie, die deine Privatsphäre respektiert.",
-  },
-  {
-    icon: Smartphone,
-    title: "iPhone & Android Apps",
-    description: "Sofortige Backups deiner Fotos vom Handy in die Cloud. Unterstützt die nativen Immich-Apps.",
-  },
-  {
-    icon: Lock,
     title: "Deine Daten gehören dir",
     description: "Verschlüsselt gespeichert in der Schweiz. Kein Tracking, keine Werbung, kein KI-Training mit deinen Bildern.",
   },
   {
-    icon: Map,
-    title: "Fotos auf der Weltkarte",
-    description: "Sieh wo deine Erinnerungen entstanden sind. GPS-Daten werden sicher und privat verarbeitet.",
+    icon: Smartphone,
+    title: "Native Mobile Apps",
+    description: "Sofortige Backups und Sync vom Handy. Unterstützt Immich und Nextcloud Apps für iOS & Android.",
+  },
+  {
+    icon: Lock,
+    title: "Isolierte Instanzen",
+    description: "Jede Cloud läuft in eigenen Containern mit separater Datenbank. Maximale Sicherheit und Privatsphäre.",
+  },
+  {
+    icon: Cloud,
+    title: "Wähle deine Plattform",
+    description: "Immich für Fotos mit KI-Erkennung oder Nextcloud für Dateien, Kalender und Office – du entscheidest.",
   },
   {
     icon: Search,
     title: "Intelligente Suche",
-    description: "Finde Fotos nach Personen, Objekten, Orten oder Datum. KI-gestützte Objekterkennung inklusive.",
+    description: "Finde Fotos nach Personen, Objekten oder Orten. Nextcloud bietet Volltextsuche in Dokumenten.",
   },
   {
     icon: Users,
     title: "Teile mit Familie & Freunden",
-    description: "Lade weitere Nutzer ein. Erstelle geteilte Alben und verwalte Zugriffsrechte.",
+    description: "Lade weitere Nutzer ein. Erstelle geteilte Alben oder Ordner und verwalte Zugriffsrechte.",
   },
 ]
 
@@ -119,38 +117,38 @@ const planDetails = [
 
 const allFeatures = [
   "Keine Werbung oder Tracking",
-  "Gesichtserkennung mit Privatsphäre",
-  "KI-Objekterkennung",
+  "Wahl zwischen Immich & Nextcloud",
+  "Automatische Backups",
   "Weitere Nutzer einladen",
-  "Erweiterte Duplikaterkennung",
+  "Eigene Subdomain",
   "Sichere & private Speicherung",
   "Gehostet in der Schweiz 🇨🇭",
   "Keine Upload-Limits",
   "Voller API-Zugang",
-  "Fotos archivieren",
+  "DSGVO-konformer Export",
   "Support durch echte Menschen",
   "Verschlüsselt gespeichert",
-  "Fotos auf der Weltkarte",
+  "Mobile & Desktop Apps",
   "Teilen mit wem du willst",
-  "Detaillierte Bildsuche",
+  "Monatlich kündbar",
 ]
 
 const faqs = [
   {
-    q: "Was ist Immich?",
-    a: "Immich ist eine führende Open-Source Foto-Cloud mit aktiver Community und tausenden Nutzern. Wir hosten und warten es für dich – inklusive Updates und Sicherheits-Patches.",
+    q: "Was ist der Unterschied zwischen Immich und Nextcloud?",
+    a: "Immich ist spezialisiert auf Fotos & Videos mit KI-gestützter Gesichts- und Objekterkennung. Nextcloud ist eine komplette Cloud-Lösung für Dateien, Kalender, Kontakte und Office-Dokumente. Beide laufen isoliert auf Schweizer Servern.",
   },
   {
-    q: "Kann ich von Google Photos wechseln?",
-    a: "Ja! Wir haben eine detaillierte Anleitung zum Migrieren deiner Fotos von Google Photos. Alle Metadaten und Alben bleiben erhalten.",
+    q: "Kann ich später die Plattform wechseln?",
+    a: "Ein direkter Wechsel ist nicht möglich, aber du kannst deine Daten exportieren und eine neue Instanz mit der anderen Plattform erstellen. Kontaktiere uns für Unterstützung.",
   },
   {
     q: "Wie sicher sind meine Daten?",
-    a: "Jede Instanz läuft isoliert mit eigenen Datenbanken und Secrets. Deine Daten sind verschlüsselt und werden ausschliesslich in der Schweiz gespeichert.",
+    a: "Jede Instanz läuft isoliert mit eigenen Containern, Datenbanken und Secrets. Deine Daten werden ausschliesslich in der Schweiz gespeichert.",
   },
   {
-    q: "Kann ich meine Fotos exportieren?",
-    a: "Ja, jederzeit. Vollständige Exporte via Web oder CLI sind kostenfrei möglich. Deine Daten gehören dir – für immer.",
+    q: "Kann ich meine Daten exportieren?",
+    a: "Ja, jederzeit. DSGVO-konforme Exporte sind kostenlos möglich. Deine Daten gehören dir – für immer.",
   },
   {
     q: "Wie läuft die Abrechnung?",
@@ -158,7 +156,7 @@ const faqs = [
   },
   {
     q: "Gibt es eine kostenlose Testversion?",
-    a: "Aktuell bieten wir keine kostenlose Version an, aber du kannst jederzeit innerhalb von 14 Tagen kündigen und erhältst dein Geld zurück.",
+    a: "Aktuell bieten wir keine kostenlose Version an, aber du kannst innerhalb von 14 Tagen kündigen und erhältst dein Geld zurück.",
   },
 ]
 
@@ -255,17 +253,17 @@ export default function Home() {
                 🇨🇭 Gehostet in der Schweiz
               </Badge>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Befreie deine Fotos von
-                <span className="block text-primary">amerikanischen Tech-Plattformen</span>
+                Deine private Cloud
+                <span className="block text-primary">ohne Big-Tech Überwachung</span>
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-                Privatsphäre und Sicherheit sind keine Option. Speichere deine Erinnerungen auf Schweizer Boden – 
-                mit KI-Funktionen, die deine Daten respektieren.
+                Fotos, Dateien oder beides – du wählst. Immich für KI-gestützte Fotoverwaltung 
+                oder Nextcloud für deine komplette Cloud. Gehostet auf Schweizer Servern.
               </p>
               <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
                 <Button size="lg" className="h-12 px-8 text-base" asChild>
                   <a href="#pricing">
-                    Kostenlos starten
+                    Jetzt starten
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </a>
                 </Button>
@@ -306,68 +304,108 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Phone Backup Section */}
+        {/* Platform Comparison Section */}
         <section className="py-20">
           <div className="container mx-auto px-4">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
-              <div>
-                <Badge variant="outline" className="mb-4">Mobile Apps</Badge>
-                <h2 className="text-3xl font-bold md:text-4xl">iPhone & Android Apps</h2>
-                <p className="mt-4 text-lg text-muted-foreground">
-                  SPhoto unterstützt die nativen Immich-Apps für sofortige Backups deiner Fotos vom Handy in die Cloud. 
-                  Basiert auf einer optimierten Version von Immich.
-                </p>
-                <ul className="mt-6 space-y-3">
-                  <li className="flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    <span>Fotos auf dem Handy ansehen</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    <span>Sofortige und sichere Backups</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    <span>Erstklassiger Support für iPhone und Android</span>
-                  </li>
-                </ul>
-                <div className="mt-8 flex gap-4">
-                  <Button variant="outline" asChild>
-                    <a href="https://apps.apple.com/app/immich/id1613945652" target="_blank" rel="noreferrer">
-                      App Store
-                    </a>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <a href="https://play.google.com/store/apps/details?id=app.alextran.immich" target="_blank" rel="noreferrer">
-                      Google Play
-                    </a>
-                  </Button>
-                </div>
-              </div>
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-primary/5 blur-2xl" />
-                  <Card className="relative w-72 shadow-2xl">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
-                          <Upload className="h-5 w-5 text-primary-foreground" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">Auto-Backup aktiv</p>
-                          <p className="text-sm text-muted-foreground">1.247 Fotos gesichert</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                        <div className="h-2 rounded-full bg-muted">
-                          <div className="h-full w-3/4 rounded-full bg-primary" />
-                        </div>
-                        <p className="text-xs text-muted-foreground">150 GB von 200 GB verwendet</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
+            <div className="mx-auto max-w-2xl text-center mb-12">
+              <Badge variant="outline" className="mb-4">Zwei Plattformen</Badge>
+              <h2 className="text-3xl font-bold md:text-4xl">Wähle was zu dir passt</h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Beide Plattformen laufen isoliert auf Schweizer Servern mit nativen Mobile Apps.
+              </p>
+            </div>
+            <div className="grid gap-8 lg:grid-cols-2 max-w-5xl mx-auto">
+              {/* Immich */}
+              <Card className="border-primary/30">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                      <Camera className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Immich</CardTitle>
+                      <CardDescription>Foto-Cloud mit KI</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-muted-foreground">
+                    Perfekt für alle, die ihre Fotos & Videos organisieren wollen. Mit KI-gestützter 
+                    Gesichtserkennung und Objekterkennung.
+                  </p>
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Gesichtserkennung & Personenalben
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Fotos auf Weltkarte anzeigen
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Objekterkennung (Hund, Auto, etc.)
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Duplikat-Erkennung
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      iOS & Android App
+                    </li>
+                  </ul>
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Ideal als Google Photos oder iCloud Alternative
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Nextcloud */}
+              <Card className="border-blue-500/30">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
+                      <Cloud className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <CardTitle>Nextcloud</CardTitle>
+                      <CardDescription>Komplette Cloud-Lösung</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-muted-foreground">
+                    Die All-in-One Lösung für Dateien, Kalender, Kontakte und mehr. 
+                    Mit Office-Integration und Collaboration-Tools.
+                  </p>
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Datei-Synchronisation
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Kalender & Kontakte Sync
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Office-Dokumente bearbeiten
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Notizen & Aufgaben
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      iOS, Android & Desktop App
+                    </li>
+                  </ul>
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Ideal als Google Drive oder Dropbox Alternative
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
@@ -519,28 +557,28 @@ export default function Home() {
           <div className="container mx-auto px-4">
             <div className="mx-auto max-w-3xl text-center">
               <Badge variant="outline" className="mb-4">Open Source</Badge>
-              <h2 className="text-3xl font-bold md:text-4xl">Basiert auf einer führenden Open-Source Plattform</h2>
+              <h2 className="text-3xl font-bold md:text-4xl">Basiert auf führenden Open-Source Projekten</h2>
               <p className="mt-4 text-lg text-muted-foreground">
-                Aufgebaut auf Immich – einem vertrauenswürdigen Open-Source Projekt mit einer lebendigen Community 
-                und tausenden aktiven Nutzern. Erlebe die Zuverlässigkeit und Innovation einer Plattform, 
-                die für moderne Fotospeicherung entwickelt wurde.
+                Immich und Nextcloud sind bewährte Open-Source Projekte mit Millionen von Nutzern weltweit. 
+                Wir hosten, warten und aktualisieren sie für dich – du profitierst von der Innovation 
+                einer aktiven Community.
               </p>
               <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg border bg-card p-4">
-                  <p className="font-semibold">Sicher & privat</p>
-                  <p className="text-sm text-muted-foreground">Verschlüsselte Speicherung</p>
+                  <p className="font-semibold">100% Open Source</p>
+                  <p className="text-sm text-muted-foreground">Kein Vendor Lock-in</p>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
-                  <p className="font-semibold">Aktive Community</p>
-                  <p className="text-sm text-muted-foreground">Tausende Nutzer weltweit</p>
+                  <p className="font-semibold">Schweizer Server</p>
+                  <p className="text-sm text-muted-foreground">Daten bleiben in der CH</p>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
-                  <p className="font-semibold">Regelmässige Updates</p>
-                  <p className="text-sm text-muted-foreground">Ständige Verbesserungen</p>
+                  <p className="font-semibold">Automatische Updates</p>
+                  <p className="text-sm text-muted-foreground">Immer aktuell & sicher</p>
                 </div>
                 <div className="rounded-lg border bg-card p-4">
-                  <p className="font-semibold">Skalierbar</p>
-                  <p className="text-sm text-muted-foreground">Für privat & Business</p>
+                  <p className="font-semibold">Volle Kontrolle</p>
+                  <p className="text-sm text-muted-foreground">Export jederzeit möglich</p>
                 </div>
               </div>
             </div>
