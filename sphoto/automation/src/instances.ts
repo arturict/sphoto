@@ -8,7 +8,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { InstanceMetadata, CreateInstanceResult, Plan, Platform } from './types';
-import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
+import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH, COOLIFY_MODE, NETWORK_NAME } from './config';
 
 const execAsync = promisify(exec);
 
@@ -252,6 +252,24 @@ function generateNextcloudCompose(
   adminPass: string,
   uploadsVolume: string
 ): string {
+  // Different labels format for Coolify vs standalone
+  const traefikLabels = COOLIFY_MODE ? `
+      - "traefik.enable=true"
+      - "traefik.http.routers.${id}-https.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}-https.entryPoints=https"
+      - "traefik.http.routers.${id}-https.tls=true"
+      - "traefik.http.routers.${id}-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${id}-https.service=${id}"
+      - "traefik.http.routers.${id}-http.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}-http.entryPoints=http"
+      - "traefik.http.routers.${id}-http.middlewares=redirect-to-https"
+      - "traefik.http.services.${id}.loadbalancer.server.port=80"` : `
+      - "traefik.enable=true"
+      - "traefik.http.routers.${id}.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}.entrypoints=websecure"
+      - "traefik.http.routers.${id}.tls.certresolver=le"
+      - "traefik.http.services.${id}.loadbalancer.server.port=80"`;
+
   return `
 name: sphoto-${id}
 
@@ -278,14 +296,9 @@ services:
       - redis
     restart: unless-stopped
     networks:
-      - sphoto-net
+      - ${NETWORK_NAME}
       - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${id}.rule=Host(\`${id}.${env.DOMAIN}\`)"
-      - "traefik.http.routers.${id}.entrypoints=websecure"
-      - "traefik.http.routers.${id}.tls.certresolver=le"
-      - "traefik.http.services.${id}.loadbalancer.server.port=80"
+    labels:${traefikLabels}
 
   db:
     image: postgres:15-alpine
@@ -308,7 +321,7 @@ services:
       - internal
 
 networks:
-  sphoto-net:
+  ${NETWORK_NAME}:
     external: true
   internal:
 `;
@@ -319,6 +332,24 @@ function generateImmichCompose(
   dbPass: string,
   uploadsVolume: string
 ): string {
+  // Different labels format for Coolify vs standalone
+  const traefikLabels = COOLIFY_MODE ? `
+      - "traefik.enable=true"
+      - "traefik.http.routers.${id}-https.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}-https.entryPoints=https"
+      - "traefik.http.routers.${id}-https.tls=true"
+      - "traefik.http.routers.${id}-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${id}-https.service=${id}"
+      - "traefik.http.routers.${id}-http.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}-http.entryPoints=http"
+      - "traefik.http.routers.${id}-http.middlewares=redirect-to-https"
+      - "traefik.http.services.${id}.loadbalancer.server.port=2283"` : `
+      - "traefik.enable=true"
+      - "traefik.http.routers.${id}.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}.entrypoints=websecure"
+      - "traefik.http.routers.${id}.tls.certresolver=le"
+      - "traefik.http.services.${id}.loadbalancer.server.port=2283"`;
+
   return `
 name: sphoto-${id}
 
@@ -337,14 +368,9 @@ services:
       - redis
     restart: unless-stopped
     networks:
-      - sphoto-net
+      - ${NETWORK_NAME}
       - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${id}.rule=Host(\`${id}.${env.DOMAIN}\`)"
-      - "traefik.http.routers.${id}.entrypoints=websecure"
-      - "traefik.http.routers.${id}.tls.certresolver=le"
-      - "traefik.http.services.${id}.loadbalancer.server.port=2283"
+    labels:${traefikLabels}
 
   db:
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
@@ -367,7 +393,7 @@ services:
       - internal
 
 networks:
-  sphoto-net:
+  ${NETWORK_NAME}:
     external: true
   internal:
 `;

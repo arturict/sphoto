@@ -1,0 +1,137 @@
+# =============================================================================
+# SPhoto - Coolify Deployment (ohne eigene Traefik)
+# Nutzt Coolify's Traefik für SSL und Routing
+# Domain: sphoto.arturf.ch
+# =============================================================================
+
+name: sphoto
+
+services:
+  # ===========================================================================
+  # Machine Learning (Shared für alle Instanzen)
+  # ===========================================================================
+  ml:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: sphoto-ml
+    volumes:
+      - ml-cache:/cache
+    environment:
+      - MACHINE_LEARNING_WORKERS=2
+    networks:
+      - coolify
+      - internal
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+
+  # ===========================================================================
+  # Automation Server (Stripe Webhooks, Instance Management)
+  # ===========================================================================
+  automation:
+    build: ./automation
+    container_name: sphoto-automation
+    environment:
+      - DOMAIN=${DOMAIN}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_BASIC=${STRIPE_PRICE_BASIC}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - IMMICH_VERSION=${IMMICH_VERSION:-release}
+      - EXTERNAL_STORAGE_PATH=${EXTERNAL_STORAGE_PATH:-}
+      - COOLIFY_MODE=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data/instances:/data/instances
+      - ${EXTERNAL_STORAGE_PATH:-/data/instances}:${EXTERNAL_STORAGE_PATH:-/data/instances}
+    networks:
+      - coolify
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      # HTTPS Router
+      - "traefik.http.routers.sphoto-api-https.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-api-https.entryPoints=https"
+      - "traefik.http.routers.sphoto-api-https.tls=true"
+      - "traefik.http.routers.sphoto-api-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sphoto-api-https.service=sphoto-api"
+      # HTTP Router (redirect)
+      - "traefik.http.routers.sphoto-api-http.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-api-http.entryPoints=http"
+      - "traefik.http.routers.sphoto-api-http.middlewares=redirect-to-https"
+      # Service
+      - "traefik.http.services.sphoto-api.loadbalancer.server.port=3000"
+
+  # ===========================================================================
+  # Stats Dashboard (Admin Protected)
+  # ===========================================================================
+  stats:
+    build: ./stats
+    container_name: sphoto-stats
+    environment:
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASS=${ADMIN_PASS}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    volumes:
+      - /data/instances:/data/instances:ro
+    networks:
+      - coolify
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      # HTTPS Router
+      - "traefik.http.routers.sphoto-stats-https.rule=Host(`stats.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-stats-https.entryPoints=https"
+      - "traefik.http.routers.sphoto-stats-https.tls=true"
+      - "traefik.http.routers.sphoto-stats-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sphoto-stats-https.service=sphoto-stats"
+      - "traefik.http.routers.sphoto-stats-https.middlewares=sphoto-stats-auth"
+      # HTTP Router (redirect)
+      - "traefik.http.routers.sphoto-stats-http.rule=Host(`stats.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-stats-http.entryPoints=http"
+      - "traefik.http.routers.sphoto-stats-http.middlewares=redirect-to-https"
+      # Service
+      - "traefik.http.services.sphoto-stats.loadbalancer.server.port=3000"
+      # Basic Auth Middleware
+      - "traefik.http.middlewares.sphoto-stats-auth.basicauth.users=${TRAEFIK_AUTH}"
+
+  # ===========================================================================
+  # Web App (Landing + Admin Dashboard)
+  # ===========================================================================
+  web:
+    build: ./web
+    container_name: sphoto-web
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}
+      - NEXT_PUBLIC_DOMAIN=${DOMAIN}
+    networks:
+      - coolify
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      # HTTPS Router
+      - "traefik.http.routers.sphoto-web-https.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-web-https.entryPoints=https"
+      - "traefik.http.routers.sphoto-web-https.tls=true"
+      - "traefik.http.routers.sphoto-web-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sphoto-web-https.service=sphoto-web"
+      # HTTP Router (redirect)
+      - "traefik.http.routers.sphoto-web-http.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-web-http.entryPoints=http"
+      - "traefik.http.routers.sphoto-web-http.middlewares=redirect-to-https"
+      # Service
+      - "traefik.http.services.sphoto-web.loadbalancer.server.port=3000"
+
+networks:
+  coolify:
+    external: true
+  internal:
+    driver: bridge
+
+volumes:
+  ml-cache:

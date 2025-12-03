@@ -23,6 +23,13 @@ export const INSTANCES_DIR = '/data/instances';
 // Example: /mnt/nas/sphoto or /mnt/hdd/sphoto
 export const EXTERNAL_STORAGE_PATH = process.env.EXTERNAL_STORAGE_PATH || '';
 
+// Coolify mode: use 'coolify' network instead of 'sphoto-net'
+// and use Coolify's Traefik labels format
+export const COOLIFY_MODE = process.env.COOLIFY_MODE === 'true';
+
+// Network name based on mode
+export const NETWORK_NAME = COOLIFY_MODE ? 'coolify' : 'sphoto-net';
+
 export const PLANS: Plans = {
   [env.STRIPE_PRICE_BASIC]: { name: 'Basic', storage: 200 },
   [env.STRIPE_PRICE_PRO]: { name: 'Pro', storage: 1000 },
