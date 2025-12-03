@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Filter,
   HardDrive,
-  Key,
   Mail,
   Play,
   RefreshCw,
@@ -131,22 +130,16 @@ function StorageUsageCell({
   instanceId, 
   storageQuota, 
   apiKey,
-  immichApiKeys 
 }: { 
   instanceId: string
   storageQuota: number
   apiKey: string
-  immichApiKeys: Record<string, string>
 }) {
   const [stats, setStats] = useState<InstanceStats | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  const immichKey = immichApiKeys[instanceId]
-
   useEffect(() => {
-    if (!immichKey) return
-    
     const fetchStats = async () => {
       setLoading(true)
       setError(false)
@@ -154,7 +147,6 @@ function StorageUsageCell({
         const res = await fetch(`${API_URL}/api/instances/${instanceId}/stats`, {
           headers: {
             'x-api-key': apiKey,
-            'x-immich-api-key': immichKey,
           },
         })
         if (res.ok) {
@@ -171,17 +163,9 @@ function StorageUsageCell({
     }
 
     fetchStats()
-  }, [instanceId, apiKey, immichKey])
+  }, [instanceId, apiKey])
 
   const quotaBytes = storageQuota * 1024 * 1024 * 1024
-
-  if (!immichKey) {
-    return (
-      <span className="text-muted-foreground text-xs">
-        API Key fehlt
-      </span>
-    )
-  }
 
   if (loading) {
     return <span className="text-muted-foreground text-xs animate-pulse">Laden...</span>
@@ -228,26 +212,11 @@ export default function AdminPage() {
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [immichApiKeys, setImmichApiKeys] = useState<Record<string, string>>({})
   const [filters, setFilters] = useState<{ query: string; status: StatusFilter; plan: PlanFilter }>({
     query: "",
     status: "all",
     plan: "all",
   })
-
-  // Load stored Immich API keys from localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const keys: Record<string, string> = {}
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith("immich_api_key_")) {
-        const instanceId = key.replace("immich_api_key_", "")
-        keys[instanceId] = localStorage.getItem(key) || ""
-      }
-    }
-    setImmichApiKeys(keys)
-  }, [])
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("admin_api_key") : null
@@ -807,7 +776,6 @@ export default function AdminPage() {
                                 instanceId={instance.id}
                                 storageQuota={instance.storage_gb}
                                 apiKey={apiKey}
-                                immichApiKeys={immichApiKeys}
                               />
                             ) : (
                               <span className="text-muted-foreground">
@@ -833,29 +801,6 @@ export default function AdminPage() {
                                   {canStop ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const key = prompt(`Immich API Key für ${instance.id}:`, immichApiKeys[instance.id] || "")
-                                  if (key !== null) {
-                                    if (key) {
-                                      localStorage.setItem(`immich_api_key_${instance.id}`, key)
-                                      setImmichApiKeys(prev => ({ ...prev, [instance.id]: key }))
-                                    } else {
-                                      localStorage.removeItem(`immich_api_key_${instance.id}`)
-                                      setImmichApiKeys(prev => {
-                                        const next = { ...prev }
-                                        delete next[instance.id]
-                                        return next
-                                      })
-                                    }
-                                  }
-                                }}
-                                title={immichApiKeys[instance.id] ? "API Key ändern" : "API Key setzen"}
-                              >
-                                <Key className={`h-4 w-4 ${immichApiKeys[instance.id] ? "text-green-600" : "text-muted-foreground"}`} />
-                              </Button>
                               {!isDeleted && (
                                 deleteConfirm === instance.id ? (
                                   <Button

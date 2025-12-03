@@ -20,6 +20,7 @@ export interface InstanceMetadata {
   status: 'active' | 'stopped' | 'deleted';
   initialPassword?: string;
   stopped_at?: string;
+  immichApiKey?: string;
 }
 
 export interface CreateInstanceResult {

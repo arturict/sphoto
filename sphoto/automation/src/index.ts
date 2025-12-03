@@ -139,12 +139,30 @@ app.delete('/api/instances/:id', adminAuth, async (req: Request, res: Response) 
 // =============================================================================
 app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Response) => {
   try {
-    const instanceApiKey = req.headers['x-immich-api-key'] as string;
+    const instanceId = req.params.id;
+    
+    // First try to get the stored API key from metadata
+    let instanceApiKey = req.headers['x-immich-api-key'] as string;
+    
     if (!instanceApiKey) {
-      return res.status(400).json({ error: 'Missing x-immich-api-key header' });
+      // Try to get from stored metadata
+      const { existsSync, readFileSync } = await import('fs');
+      const { join } = await import('path');
+      const metaPath = join('/data/instances', instanceId, 'metadata.json');
+      
+      if (existsSync(metaPath)) {
+        const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+        if (meta.immichApiKey) {
+          instanceApiKey = meta.immichApiKey;
+        }
+      }
+    }
+    
+    if (!instanceApiKey) {
+      return res.status(400).json({ error: 'No API key available for this instance' });
     }
 
-    const instanceUrl = `https://${req.params.id}.${env.DOMAIN}`;
+    const instanceUrl = `https://${instanceId}.${env.DOMAIN}`;
     const response = await fetch(`${instanceUrl}/api/server/statistics`, {
       headers: { 'x-api-key': instanceApiKey },
     });

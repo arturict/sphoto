@@ -52,7 +52,7 @@ export async function setupImmichAdmin(
   email: string, 
   password: string, 
   quotaBytes: number
-): Promise<boolean> {
+): Promise<{ success: boolean; apiKey?: string }> {
   try {
     // First, sign up the admin user (first user becomes admin)
     const signUpResponse = await fetch(`${instanceUrl}/api/auth/admin-sign-up`, {
@@ -68,7 +68,7 @@ export async function setupImmichAdmin(
     if (!signUpResponse.ok) {
       const error = await signUpResponse.text();
       console.error('Admin signup failed:', error);
-      return false;
+      return { success: false };
     }
 
     const adminUser = await signUpResponse.json() as { id: string; email: string };
@@ -83,7 +83,7 @@ export async function setupImmichAdmin(
 
     if (!loginResponse.ok) {
       console.error('Admin login failed');
-      return false;
+      return { success: false };
     }
 
     const loginData = await loginResponse.json() as { accessToken: string };
@@ -110,10 +110,33 @@ export async function setupImmichAdmin(
       }
     }
 
-    return true;
+    // Create an API key for admin stats access
+    let apiKey: string | undefined;
+    try {
+      const apiKeyResponse = await fetch(`${instanceUrl}/api/api-keys`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          name: 'SPhoto Admin Stats',
+        }),
+      });
+
+      if (apiKeyResponse.ok) {
+        const apiKeyData = await apiKeyResponse.json() as { secret: string };
+        apiKey = apiKeyData.secret;
+        console.log('API key created for admin stats');
+      }
+    } catch (err) {
+      console.error('Failed to create API key:', err);
+    }
+
+    return { success: true, apiKey };
   } catch (err) {
     console.error('Immich setup error:', err);
-    return false;
+    return { success: false };
   }
 }
 
@@ -204,11 +227,14 @@ networks:
   const isReady = await waitForInstance(instanceUrl);
   
   if (isReady) {
-    const setupSuccess = await setupImmichAdmin(instanceUrl, email, userPassword, quotaBytes);
-    if (setupSuccess) {
+    const setupResult = await setupImmichAdmin(instanceUrl, email, userPassword, quotaBytes);
+    if (setupResult.success) {
       const metaPath = join(dir, 'metadata.json');
       const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
       meta.initialPassword = userPassword;
+      if (setupResult.apiKey) {
+        meta.immichApiKey = setupResult.apiKey;
+      }
       writeFileSync(metaPath, JSON.stringify(meta, null, 2));
       console.log(`Instance ${id} fully configured`);
       return { success: true, password: userPassword };
