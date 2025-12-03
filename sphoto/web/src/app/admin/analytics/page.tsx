@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -20,6 +20,9 @@ import {
   AlertTriangle,
   RefreshCw,
   Activity,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -44,6 +47,24 @@ function formatBytes(bytes: number): string {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit" })
+}
+
+function formatFullDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("de-CH", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function GrowthIndicator({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const isPositive = value > 0
+  const isZero = value === 0
+  const Icon = isPositive ? ArrowUpRight : isZero ? null : ArrowDownRight
+  const color = isPositive ? "text-green-600" : isZero ? "text-muted-foreground" : "text-red-600"
+  
+  return (
+    <span className={`flex items-center gap-0.5 text-sm font-medium ${color}`}>
+      {Icon && <Icon className="h-4 w-4" />}
+      {isPositive ? "+" : ""}{value.toFixed(1)}{suffix}
+    </span>
+  )
 }
 
 export default function AnalyticsPage() {
@@ -121,6 +142,64 @@ export default function AnalyticsPage() {
     setIsAuthed(true)
   }
 
+  // Computed analytics values
+  const computedStats = useMemo(() => {
+    if (!analytics) return null
+    
+    const uploadTrend = analytics.uploadTrend
+    const storageGrowth = analytics.storageGrowth
+    
+    // Total uploads
+    const totalUploads = uploadTrend.reduce((sum, d) => sum + d.uploads, 0)
+    
+    // Average uploads per day
+    const avgUploadsPerDay = uploadTrend.length > 0 ? totalUploads / uploadTrend.length : 0
+    
+    // Upload growth (compare first half to second half)
+    const halfIdx = Math.floor(uploadTrend.length / 2)
+    const firstHalf = uploadTrend.slice(0, halfIdx)
+    const secondHalf = uploadTrend.slice(halfIdx)
+    const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((s, d) => s + d.uploads, 0) / firstHalf.length : 0
+    const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((s, d) => s + d.uploads, 0) / secondHalf.length : 0
+    const uploadGrowthPercent = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0
+    
+    // Storage stats
+    const latestStorage = storageGrowth[storageGrowth.length - 1]?.total_bytes || 0
+    const firstStorage = storageGrowth[0]?.total_bytes || 0
+    const storageGrowthBytes = latestStorage - firstStorage
+    const storageGrowthPercent = firstStorage > 0 ? ((latestStorage - firstStorage) / firstStorage) * 100 : 0
+    
+    // Peak day
+    const peakDay = uploadTrend.length > 0 
+      ? uploadTrend.reduce((max, d) => d.uploads > max.uploads ? d : max, uploadTrend[0])
+      : null
+    
+    // Instance utilization
+    const totalInstances = analytics.activeInstances + analytics.inactiveInstances
+    const utilizationPercent = totalInstances > 0 ? (analytics.activeInstances / totalInstances) * 100 : 0
+    
+    // Average storage per instance
+    const avgStoragePerInstance = analytics.topInstances.length > 0
+      ? analytics.topInstances.reduce((s, i) => s + i.storage_bytes, 0) / analytics.topInstances.length
+      : 0
+    
+    // Total files
+    const totalFiles = analytics.topInstances.reduce((s, i) => s + i.files, 0)
+    
+    return {
+      totalUploads,
+      avgUploadsPerDay,
+      uploadGrowthPercent,
+      latestStorage,
+      storageGrowthBytes,
+      storageGrowthPercent,
+      peakDay,
+      utilizationPercent,
+      avgStoragePerInstance,
+      totalFiles,
+    }
+  }, [analytics])
+
   if (!isAuthed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -146,9 +225,6 @@ export default function AnalyticsPage() {
     )
   }
 
-  const totalUploads = analytics?.uploadTrend.reduce((sum, d) => sum + d.uploads, 0) || 0
-  const latestStorage = analytics?.storageGrowth[analytics.storageGrowth.length - 1]?.total_bytes || 0
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-20">
@@ -171,6 +247,7 @@ export default function AnalyticsPage() {
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value={7}>7 Tage</option>
+              <option value={14}>14 Tage</option>
               <option value={30}>30 Tage</option>
               <option value={60}>60 Tage</option>
               <option value={90}>90 Tage</option>
@@ -196,46 +273,129 @@ export default function AnalyticsPage() {
           <div className="py-12 text-center text-muted-foreground">Lade Analytics...</div>
         )}
 
-        {analytics && (
+        {analytics && computedStats && (
           <>
-            {/* Summary Cards */}
+            {/* Primary Stats */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <TrendingUp className="h-10 w-10 text-green-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Uploads ({days}d)</p>
-                    <p className="text-2xl font-semibold">{totalUploads.toLocaleString()}</p>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Uploads ({days}d)</p>
+                      <p className="text-2xl font-semibold">{computedStats.totalUploads.toLocaleString()}</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-green-500" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <GrowthIndicator value={computedStats.uploadGrowthPercent} suffix="%" />
+                    <span className="text-xs text-muted-foreground">vs. Vorperiode</span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <HardDrive className="h-10 w-10 text-blue-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Gesamt-Speicher</p>
-                    <p className="text-2xl font-semibold">{formatBytes(latestStorage)}</p>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Gesamt-Speicher</p>
+                      <p className="text-2xl font-semibold">{formatBytes(computedStats.latestStorage)}</p>
+                    </div>
+                    <HardDrive className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <GrowthIndicator value={computedStats.storageGrowthPercent} suffix="%" />
+                    <span className="text-xs text-muted-foreground">+{formatBytes(computedStats.storageGrowthBytes)}</span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <Users className="h-10 w-10 text-primary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Aktive Instanzen</p>
-                    <p className="text-2xl font-semibold">{analytics.activeInstances}</p>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Aktive Instanzen</p>
+                      <p className="text-2xl font-semibold">{analytics.activeInstances}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {computedStats.utilizationPercent.toFixed(0)}% Auslastung
+                    </span>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="flex items-center gap-4 pt-6">
-                  <AlertTriangle className="h-10 w-10 text-amber-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Churn Risk</p>
-                    <p className="text-2xl font-semibold">{analytics.churnRisk.length}</p>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Churn Risk</p>
+                      <p className="text-2xl font-semibold">{analytics.churnRisk.length}</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-amber-500" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">14+ Tage inaktiv</span>
                   </div>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Secondary Stats */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <Activity className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ø Uploads/Tag</p>
+                      <p className="text-lg font-semibold">{computedStats.avgUploadsPerDay.toFixed(1)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                      <HardDrive className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ø Speicher/Instanz</p>
+                      <p className="text-lg font-semibold">{formatBytes(computedStats.avgStoragePerInstance)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
+                      <BarChart3 className="h-5 w-5 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Dateien</p>
+                      <p className="text-lg font-semibold">{computedStats.totalFiles.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              {computedStats.peakDay && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                        <Calendar className="h-5 w-5 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Peak Tag</p>
+                        <p className="text-lg font-semibold">{computedStats.peakDay.uploads} Uploads</p>
+                        <p className="text-xs text-muted-foreground">{formatFullDate(computedStats.peakDay.date)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">

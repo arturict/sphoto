@@ -68,6 +68,9 @@ interface InstanceStats {
 
 type StatusFilter = "all" | Instance["status"]
 type PlanFilter = "all" | "Basic" | "Pro"
+type PlatformFilter = "all" | "immich" | "nextcloud"
+type SortField = "created" | "id" | "email" | "plan" | "storage_gb" | "platform"
+type SortOrder = "asc" | "desc"
 
 const statusPalette: Record<Instance["status"], string> = {
   active: "bg-green-500/10 text-green-600",
@@ -234,10 +237,20 @@ export default function AdminPage() {
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [filters, setFilters] = useState<{ query: string; status: StatusFilter; plan: PlanFilter }>({
+  const [filters, setFilters] = useState<{ 
+    query: string; 
+    status: StatusFilter; 
+    plan: PlanFilter;
+    platform: PlatformFilter;
+  }>({
     query: "",
     status: "all",
     plan: "all",
+    platform: "all",
+  })
+  const [sortConfig, setSortConfig] = useState<{ field: SortField; order: SortOrder }>({
+    field: "created",
+    order: "desc",
   })
 
   useEffect(() => {
@@ -435,7 +448,15 @@ export default function AdminPage() {
     }
   }
 
-  const resetFilters = () => setFilters({ query: "", status: "all", plan: "all" })
+  const resetFilters = () => setFilters({ query: "", status: "all", plan: "all", platform: "all" })
+  
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => ({
+      field,
+      order: prev.field === field && prev.order === "asc" ? "desc" : "asc"
+    }))
+  }
+  
   const filteredInstances = useMemo(() => {
     const normalizedQuery = filters.query.trim().toLowerCase()
     return instances.filter((instance) => {
@@ -445,19 +466,47 @@ export default function AdminPage() {
         instance.email.toLowerCase().includes(normalizedQuery)
       const matchesPlan = filters.plan === "all" || instance.plan === filters.plan
       const matchesStatus = filters.status === "all" || instance.status === filters.status
-      return matchesQuery && matchesPlan && matchesStatus
+      const matchesPlatform = filters.platform === "all" || (instance.platform || "immich") === filters.platform
+      return matchesQuery && matchesPlan && matchesStatus && matchesPlatform
     })
   }, [instances, filters])
 
   const sortedInstances = useMemo(() => {
-    return [...filteredInstances].sort(
-      (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
-    )
-  }, [filteredInstances])
+    return [...filteredInstances].sort((a, b) => {
+      const { field, order } = sortConfig
+      let comparison = 0
+      
+      switch (field) {
+        case "created":
+          comparison = new Date(a.created).getTime() - new Date(b.created).getTime()
+          break
+        case "id":
+          comparison = a.id.localeCompare(b.id)
+          break
+        case "email":
+          comparison = a.email.localeCompare(b.email)
+          break
+        case "plan":
+          comparison = (a.plan || "").localeCompare(b.plan || "")
+          break
+        case "storage_gb":
+          comparison = (a.storage_gb || 0) - (b.storage_gb || 0)
+          break
+        case "platform":
+          comparison = (a.platform || "immich").localeCompare(b.platform || "immich")
+          break
+      }
+      
+      return order === "asc" ? comparison : -comparison
+    })
+  }, [filteredInstances, sortConfig])
 
   const activeCount = instances.filter((instance) => instance.status === "active").length
   const stoppedCount = instances.filter((instance) => instance.status === "stopped").length
   const totalStorage = instances.reduce((sum, instance) => sum + (instance.storage_gb || 0), 0)
+  
+  const immichCount = instances.filter((instance) => (instance.platform || "immich") === "immich").length
+  const nextcloudCount = instances.filter((instance) => instance.platform === "nextcloud").length
 
   const selectedActiveCount = useMemo(() => {
     return Array.from(selectedIds).filter(id => {
@@ -611,7 +660,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-6">
           <Card>
             <CardContent className="flex items-center gap-4 pt-6">
               <Server className="h-10 w-10 text-primary" />
@@ -648,17 +697,35 @@ export default function AdminPage() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <Camera className="h-10 w-10 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Immich</p>
+                <p className="text-2xl font-semibold">{immichCount}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <Cloud className="h-10 w-10 text-blue-500" />
+              <div>
+                <p className="text-sm text-muted-foreground">Nextcloud</p>
+                <p className="text-2xl font-semibold">{nextcloudCount}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Filter className="h-4 w-4" />
-              Filter
+              Filter & Sortierung
             </CardTitle>
-            <CardDescription>Suche nach Subdomain, E-Mail, Status oder Plan.</CardDescription>
+            <CardDescription>Suche nach Subdomain, E-Mail, Status, Plan oder Plattform.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-4">
+          <CardContent className="grid gap-4 md:grid-cols-5">
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-muted-foreground">Suche</label>
               <div className="relative mt-1">
@@ -699,11 +766,43 @@ export default function AdminPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Plattform</label>
+              <select
+                value={filters.platform}
+                onChange={(event) => setFilters((prev) => ({ ...prev, platform: event.target.value as PlatformFilter }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="all">Alle</option>
+                <option value="immich">Immich ({immichCount})</option>
+                <option value="nextcloud">Nextcloud ({nextcloudCount})</option>
+              </select>
+            </div>
           </CardContent>
-          <CardContent className="border-t pt-4">
+          <CardContent className="border-t pt-4 flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={resetFilters}>
               Filter zurücksetzen
             </Button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Sortieren:</span>
+              <select
+                value={`${sortConfig.field}-${sortConfig.order}`}
+                onChange={(e) => {
+                  const [field, order] = e.target.value.split("-") as [SortField, SortOrder]
+                  setSortConfig({ field, order })
+                }}
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                <option value="created-desc">Neueste zuerst</option>
+                <option value="created-asc">Älteste zuerst</option>
+                <option value="id-asc">Subdomain A-Z</option>
+                <option value="id-desc">Subdomain Z-A</option>
+                <option value="email-asc">E-Mail A-Z</option>
+                <option value="storage_gb-desc">Speicher ↓</option>
+                <option value="storage_gb-asc">Speicher ↑</option>
+                <option value="platform-asc">Plattform A-Z</option>
+              </select>
+            </div>
           </CardContent>
         </Card>
 

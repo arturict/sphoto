@@ -197,7 +197,8 @@ export async function setupNextcloudAdmin(
       console.error('Failed to set Nextcloud email');
     }
     
-    // Set quota
+    // Set quota (Nextcloud expects format like "200 GB" with space, or bytes)
+    const quotaValue = `${quotaGB} GB`;
     const quotaRes = await fetch(`${instanceUrl}/ocs/v1.php/cloud/users/${adminUser}`, {
       method: 'PUT',
       headers: {
@@ -205,7 +206,7 @@ export async function setupNextcloudAdmin(
         'Authorization': authHeader,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `key=quota&value=${quotaGB}GB`,
+      body: `key=quota&value=${encodeURIComponent(quotaValue)}`,
     });
     
     if (!quotaRes.ok) {
