@@ -14,18 +14,20 @@ import { Input } from "@/components/ui/input"
 import {
   Activity,
   AlertTriangle,
+  CheckSquare,
   Clock4,
   ExternalLink,
   Filter,
   HardDrive,
+  Mail,
   Play,
   RefreshCw,
   Search,
   Server,
   ShieldCheck,
   Square,
+  SquareStack,
   Trash2,
-  Users,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
@@ -55,16 +57,72 @@ const statusLabel: Record<Instance["status"], string> = {
   stopped: "Gestoppt",
   deleted: "Gelöscht",
 }
+
+function getEmailProvider(email: string): "gmail" | "outlook" | "other" {
+  const domain = email.split("@")[1]?.toLowerCase() || ""
+  if (domain === "gmail.com" || domain === "googlemail.com") return "gmail"
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.de", "hotmail.de"].includes(domain)) return "outlook"
+  return "other"
+}
+
+function EmailButton({ email }: { email: string }) {
+  const provider = getEmailProvider(email)
+  
+  if (provider === "gmail") {
+    return (
+      <a
+        href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(email)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 text-xs text-red-600 hover:underline"
+        title="In Gmail öffnen"
+      >
+        <Mail className="h-3 w-3" />
+        Gmail
+      </a>
+    )
+  }
+  
+  if (provider === "outlook") {
+    return (
+      <a
+        href={`https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(email)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+        title="In Outlook öffnen"
+      >
+        <Mail className="h-3 w-3" />
+        Outlook
+      </a>
+    )
+  }
+  
+  return (
+    <a
+      href={`mailto:${email}`}
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+      title="E-Mail senden"
+    >
+      <Mail className="h-3 w-3" />
+      Mail
+    </a>
+  )
+}
+
 export default function AdminPage() {
   const [apiKey, setApiKey] = useState("")
   const [isAuthed, setIsAuthed] = useState(false)
   const [instances, setInstances] = useState<Instance[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<{ query: string; status: StatusFilter; plan: PlanFilter }>({
     query: "",
     status: "all",
@@ -131,6 +189,15 @@ export default function AdminPage() {
       if (Array.isArray(data)) {
         setInstances(data)
         setLastSync(new Date())
+        // Clear selection for instances that no longer exist
+        setSelectedIds(prev => {
+          const existingIds = new Set(data.map((i: Instance) => i.id))
+          const newSet = new Set<string>()
+          prev.forEach(id => {
+            if (existingIds.has(id)) newSet.add(id)
+          })
+          return newSet
+        })
       }
     } catch {
       // Fehler bereits gesetzt
@@ -167,6 +234,7 @@ export default function AdminPage() {
     setApiKey("")
     setInstances([])
     setLastSync(null)
+    setSelectedIds(new Set())
   }
 
   const handleAction = async (id: string, action: "start" | "stop" | "delete") => {
@@ -183,6 +251,48 @@ export default function AdminPage() {
       // bereits behandelt
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const handleBulkAction = async (action: "stop" | "delete") => {
+    if (selectedIds.size === 0) return
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedIds).map(id => {
+        if (action === "delete") {
+          return api(`/api/instances/${id}`, "DELETE").catch(() => null)
+        } else {
+          return api(`/api/instances/${id}/${action}`, "POST").catch(() => null)
+        }
+      })
+      await Promise.all(promises)
+      setSelectedIds(new Set())
+      setBulkDeleteConfirm(false)
+      await loadInstances({ silent: true })
+    } catch {
+      // bereits behandelt
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedInstances.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedInstances.map(i => i.id)))
     }
   }
 
@@ -209,6 +319,13 @@ export default function AdminPage() {
   const activeCount = instances.filter((instance) => instance.status === "active").length
   const stoppedCount = instances.filter((instance) => instance.status === "stopped").length
   const totalStorage = instances.reduce((sum, instance) => sum + (instance.storage_gb || 0), 0)
+
+  const selectedActiveCount = useMemo(() => {
+    return Array.from(selectedIds).filter(id => {
+      const inst = instances.find(i => i.id === id)
+      return inst?.status === "active"
+    }).length
+  }, [selectedIds, instances])
 
   const planBreakdown = useMemo(() => {
     return instances.reduce((acc, instance) => {
@@ -444,8 +561,63 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-lg">
                 <span>Instanzen</span>
-                <Badge variant="secondary">{filteredInstances.length} Ergebnis(se)</Badge>
+                <div className="flex items-center gap-2">
+                  {selectedIds.size > 0 && (
+                    <Badge variant="outline" className="font-normal">
+                      <CheckSquare className="mr-1 h-3 w-3" />
+                      {selectedIds.size} ausgewählt
+                    </Badge>
+                  )}
+                  <Badge variant="secondary">{filteredInstances.length} Ergebnis(se)</Badge>
+                </div>
               </CardTitle>
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2 pt-2">
+                  <span className="text-sm text-muted-foreground">Bulk-Aktionen:</span>
+                  {selectedActiveCount > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkAction("stop")}
+                      disabled={bulkLoading}
+                    >
+                      <Square className="mr-1 h-3 w-3" />
+                      {selectedActiveCount} stoppen
+                    </Button>
+                  )}
+                  {bulkDeleteConfirm ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleBulkAction("delete")}
+                      disabled={bulkLoading}
+                    >
+                      {selectedIds.size} löschen bestätigen
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      disabled={bulkLoading}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      {selectedIds.size} löschen
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedIds(new Set())
+                      setBulkDeleteConfirm(false)
+                    }}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="overflow-x-auto">
               {loading && (
@@ -458,6 +630,15 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="pb-3 pr-2">
+                        <button
+                          onClick={toggleSelectAll}
+                          className="flex items-center gap-1 hover:text-foreground"
+                          title={selectedIds.size === sortedInstances.length ? "Alle abwählen" : "Alle auswählen"}
+                        >
+                          <SquareStack className="h-4 w-4" />
+                        </button>
+                      </th>
                       <th className="pb-3">Subdomain</th>
                       <th className="pb-3">Plan</th>
                       <th className="pb-3">Speicher</th>
@@ -471,8 +652,17 @@ export default function AdminPage() {
                       const isDeleted = instance.status === "deleted"
                       const canStop = instance.status === "active"
                       const canStart = instance.status === "stopped"
+                      const isSelected = selectedIds.has(instance.id)
                       return (
-                        <tr key={instance.id} className="border-b last:border-0">
+                        <tr key={instance.id} className={`border-b last:border-0 ${isSelected ? "bg-primary/5" : ""}`}>
+                          <td className="py-3 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(instance.id)}
+                              className="h-4 w-4 rounded border-muted"
+                            />
+                          </td>
                           <td className="py-3">
                             <a
                               href={`https://${instance.id}.${DOMAIN}`}
@@ -483,7 +673,10 @@ export default function AdminPage() {
                               {instance.id}
                               <ExternalLink className="h-3 w-3" />
                             </a>
-                            <p className="text-xs text-muted-foreground">{instance.email}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-muted-foreground">{instance.email}</p>
+                              <EmailButton email={instance.email} />
+                            </div>
                           </td>
                           <td className="py-3">
                             <Badge variant={instance.plan === "Pro" ? "default" : "secondary"}>{instance.plan}</Badge>
