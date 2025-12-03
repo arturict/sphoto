@@ -5,9 +5,8 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { env } from './config';
 import { handleWebhook, getSessionStatus, createCheckoutSession } from './stripe';
-import { checkSubdomain, isValidSubdomain } from './subdomain';
+import { checkSubdomain } from './subdomain';
 import { listInstances, getInstance, startInstance, stopInstance, deleteInstance } from './instances';
-import { RESERVED_SUBDOMAINS } from './config';
 import { getBranding, updateBranding, deleteBranding, generateCustomCss } from './branding';
 import { startExport, getExportJob, getExportByToken, listExportJobs, cleanupExpiredExports } from './export';
 import { getAnalytics, runDailyStatsCollection } from './analytics';
@@ -67,15 +66,9 @@ app.get('/checkout/:plan', async (req: Request, res: Response) => {
   
   // Validate subdomain if provided
   if (subdomain) {
-    if (!isValidSubdomain(subdomain)) {
-      return res.status(400).send('Ungültige Subdomain');
-    }
-    if (RESERVED_SUBDOMAINS.includes(subdomain)) {
-      return res.status(400).send('Subdomain reserviert');
-    }
-    const instances = listInstances();
-    if (instances.some(i => i.id === subdomain)) {
-      return res.status(400).send('Subdomain bereits vergeben');
+    const subdomainCheck = checkSubdomain(subdomain);
+    if (!subdomainCheck.available) {
+      return res.status(400).send(subdomainCheck.reason || 'Subdomain nicht verfügbar');
     }
   }
   
