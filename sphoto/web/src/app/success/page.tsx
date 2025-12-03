@@ -15,10 +15,14 @@ import {
   Download,
   Sparkles,
   XCircle,
+  Cloud,
+  Camera,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+
+type Platform = "immich" | "nextcloud"
 
 function getEmailProvider(email: string): "gmail" | "outlook" | "other" {
   const domain = email.split("@")[1]?.toLowerCase() || ""
@@ -70,6 +74,7 @@ interface SessionStatus {
   instanceUrl?: string
   email?: string
   plan?: string
+  platform?: Platform
   autoSetup?: boolean
 }
 
@@ -233,6 +238,13 @@ function SuccessContent() {
 
         <div className="flex gap-2 justify-center flex-wrap">
           <Badge variant="secondary">{status.plan}</Badge>
+          <Badge variant="outline" className="flex items-center gap-1">
+            {status.platform === "nextcloud" ? (
+              <><Cloud className="h-3 w-3" /> Nextcloud</>
+            ) : (
+              <><Camera className="h-3 w-3" /> Immich</>
+            )}
+          </Badge>
           {status.autoSetup && <Badge variant="success">Auto-Setup ✓</Badge>}
         </div>
 
@@ -256,29 +268,68 @@ function SuccessContent() {
             <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
               <p className="font-medium">Mobile App</p>
-              <p className="text-sm text-muted-foreground">
-                Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
-              </p>
-              <div className="mt-2 flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href="https://apps.apple.com/app/immich/id1613945652"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Download className="mr-1 h-3 w-3" /> iOS
-                  </a>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href="https://play.google.com/store/apps/details?id=app.alextran.immich"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Download className="mr-1 h-3 w-3" /> Android
-                  </a>
-                </Button>
-              </div>
+              {status.platform === "nextcloud" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Lade die <strong>Nextcloud</strong> App und verbinde mit deiner URL.
+                  </p>
+                  <div className="mt-2 flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href="https://apps.apple.com/app/nextcloud/id1125420102"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1 h-3 w-3" /> iOS
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href="https://play.google.com/store/apps/details?id=com.nextcloud.client"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1 h-3 w-3" /> Android
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href="https://nextcloud.com/install/#install-clients"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1 h-3 w-3" /> Desktop
+                      </a>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
+                  </p>
+                  <div className="mt-2 flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href="https://apps.apple.com/app/immich/id1613945652"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1 h-3 w-3" /> iOS
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href="https://play.google.com/store/apps/details?id=app.alextran.immich"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1 h-3 w-3" /> Android
+                      </a>
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -7,7 +7,7 @@ import { rm } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { InstanceMetadata, CreateInstanceResult, Plan } from './types';
+import type { InstanceMetadata, CreateInstanceResult, Plan, Platform } from './types';
 import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
 
 const execAsync = promisify(exec);
@@ -140,39 +140,161 @@ export async function setupImmichAdmin(
   }
 }
 
-export async function createInstance(
-  id: string, 
-  email: string, 
-  plan: Plan
-): Promise<CreateInstanceResult> {
-  console.log(`Creating instance: ${id} for ${email}`);
-  
-  const dir = join(INSTANCES_DIR, id);
-  
-  // Determine upload path: external storage or local
-  let uploadsPath: string;
-  let uploadsVolume: string;
-  
-  if (EXTERNAL_STORAGE_PATH) {
-    // Use external storage (NAS/HDD)
-    uploadsPath = join(EXTERNAL_STORAGE_PATH, id, 'uploads');
-    uploadsVolume = `${uploadsPath}:/data`;
-    mkdirSync(uploadsPath, { recursive: true });
-    console.log(`Using external storage: ${uploadsPath}`);
-  } else {
-    // Use local storage (default)
-    uploadsPath = join(dir, 'uploads');
-    uploadsVolume = './uploads:/data';
-    mkdirSync(uploadsPath, { recursive: true });
+// =============================================================================
+// Nextcloud Setup
+// =============================================================================
+
+export async function waitForNextcloud(url: string, maxAttempts = 45): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch(`${url}/status.php`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        const data = await response.json() as { installed: boolean };
+        if (data.installed) {
+          console.log(`Nextcloud ${url} is ready`);
+          return true;
+        }
+      }
+    } catch {
+      // Instance not ready yet
+    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
-  
-  mkdirSync(join(dir, 'db'), { recursive: true });
+  console.error(`Nextcloud ${url} failed to become ready`);
+  return false;
+}
 
-  const dbPass = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-  const userPassword = generatePassword();
-  const quotaBytes = plan.storage * 1024 * 1024 * 1024;
+export async function setupNextcloudAdmin(
+  instanceUrl: string, 
+  adminUser: string,
+  adminPass: string,
+  email: string, 
+  quotaGB: number
+): Promise<{ success: boolean }> {
+  try {
+    // Create admin user via OCS API
+    // First we need to wait for Nextcloud to be fully installed
+    // The admin credentials are set via environment variables during container creation
+    
+    // Update the user's email and quota
+    const authHeader = 'Basic ' + Buffer.from(`${adminUser}:${adminPass}`).toString('base64');
+    
+    // Set email
+    const emailRes = await fetch(`${instanceUrl}/ocs/v1.php/cloud/users/${adminUser}`, {
+      method: 'PUT',
+      headers: {
+        'OCS-APIRequest': 'true',
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `key=email&value=${encodeURIComponent(email)}`,
+    });
+    
+    if (!emailRes.ok) {
+      console.error('Failed to set Nextcloud email');
+    }
+    
+    // Set quota
+    const quotaRes = await fetch(`${instanceUrl}/ocs/v1.php/cloud/users/${adminUser}`, {
+      method: 'PUT',
+      headers: {
+        'OCS-APIRequest': 'true',
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `key=quota&value=${quotaGB}GB`,
+    });
+    
+    if (!quotaRes.ok) {
+      console.error('Failed to set Nextcloud quota');
+    }
+    
+    console.log(`Nextcloud admin user configured: ${adminUser}`);
+    return { success: true };
+  } catch (err) {
+    console.error('Nextcloud setup error:', err);
+    return { success: false };
+  }
+}
 
-  const compose = `
+function generateNextcloudCompose(
+  id: string,
+  dbPass: string,
+  adminUser: string,
+  adminPass: string,
+  uploadsVolume: string
+): string {
+  return `
+name: sphoto-${id}
+
+services:
+  app:
+    image: nextcloud:stable
+    container_name: sphoto-${id}-app
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=${dbPass}
+      - REDIS_HOST=redis
+      - NEXTCLOUD_ADMIN_USER=${adminUser}
+      - NEXTCLOUD_ADMIN_PASSWORD=${adminPass}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${id}.${env.DOMAIN}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=${id}.${env.DOMAIN}
+    volumes:
+      - ${uploadsVolume}
+      - ./config:/var/www/html/config
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - sphoto-net
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${id}.rule=Host(\`${id}.${env.DOMAIN}\`)"
+      - "traefik.http.routers.${id}.entrypoints=websecure"
+      - "traefik.http.routers.${id}.tls.certresolver=le"
+      - "traefik.http.services.${id}.loadbalancer.server.port=80"
+
+  db:
+    image: postgres:15-alpine
+    container_name: sphoto-${id}-db
+    environment:
+      - POSTGRES_PASSWORD=${dbPass}
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_DB=nextcloud
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    image: redis:alpine
+    container_name: sphoto-${id}-redis
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  sphoto-net:
+    external: true
+  internal:
+`;
+}
+
+function generateImmichCompose(
+  id: string,
+  dbPass: string,
+  uploadsVolume: string
+): string {
+  return `
 name: sphoto-${id}
 
 services:
@@ -224,6 +346,62 @@ networks:
     external: true
   internal:
 `;
+}
+
+// =============================================================================
+// Main Instance Creation
+// =============================================================================
+
+export async function createInstance(
+  id: string, 
+  email: string, 
+  plan: Plan,
+  platform: Platform = 'immich'
+): Promise<CreateInstanceResult> {
+  console.log(`Creating ${platform} instance: ${id} for ${email}`);
+  
+  const dir = join(INSTANCES_DIR, id);
+  
+  // Determine upload path: external storage or local
+  let uploadsPath: string;
+  let uploadsVolume: string;
+  
+  if (EXTERNAL_STORAGE_PATH) {
+    uploadsPath = join(EXTERNAL_STORAGE_PATH, id, 'uploads');
+    uploadsVolume = `${uploadsPath}:/data`;
+    if (platform === 'nextcloud') {
+      uploadsVolume = `${uploadsPath}:/var/www/html/data`;
+    }
+    mkdirSync(uploadsPath, { recursive: true });
+    console.log(`Using external storage: ${uploadsPath}`);
+  } else {
+    uploadsPath = join(dir, 'uploads');
+    uploadsVolume = './uploads:/data';
+    if (platform === 'nextcloud') {
+      uploadsVolume = './uploads:/var/www/html/data';
+    }
+    mkdirSync(uploadsPath, { recursive: true });
+  }
+  
+  mkdirSync(join(dir, 'db'), { recursive: true });
+  if (platform === 'nextcloud') {
+    mkdirSync(join(dir, 'config'), { recursive: true });
+  }
+
+  const dbPass = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  const userPassword = generatePassword();
+  const quotaBytes = plan.storage * 1024 * 1024 * 1024;
+  
+  // Generate admin username for Nextcloud
+  const adminUser = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'admin';
+
+  // Generate compose file based on platform
+  let compose: string;
+  if (platform === 'nextcloud') {
+    compose = generateNextcloudCompose(id, dbPass, adminUser, userPassword, uploadsVolume);
+  } else {
+    compose = generateImmichCompose(id, dbPass, uploadsVolume);
+  }
 
   writeFileSync(join(dir, 'docker-compose.yml'), compose);
   
@@ -232,29 +410,53 @@ networks:
     email, 
     plan: plan.name, 
     storage_gb: plan.storage,
+    platform,
     created: new Date().toISOString(), 
     status: 'active'
   };
+  
+  if (platform === 'nextcloud') {
+    metadata.nextcloudAdminUser = adminUser;
+  }
+  
   writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata, null, 2));
 
   await execAsync(`cd ${dir} && docker compose up -d`);
   console.log(`Instance ${id} containers started`);
 
   const instanceUrl = `https://${id}.${env.DOMAIN}`;
-  const isReady = await waitForInstance(instanceUrl);
   
-  if (isReady) {
-    const setupResult = await setupImmichAdmin(instanceUrl, email, userPassword, quotaBytes);
-    if (setupResult.success) {
-      const metaPath = join(dir, 'metadata.json');
-      const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
-      meta.initialPassword = userPassword;
-      if (setupResult.apiKey) {
-        meta.immichApiKey = setupResult.apiKey;
+  if (platform === 'nextcloud') {
+    const isReady = await waitForNextcloud(instanceUrl);
+    
+    if (isReady) {
+      const setupResult = await setupNextcloudAdmin(instanceUrl, adminUser, userPassword, email, plan.storage);
+      if (setupResult.success) {
+        const metaPath = join(dir, 'metadata.json');
+        const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
+        meta.initialPassword = userPassword;
+        writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+        console.log(`Nextcloud instance ${id} fully configured`);
+        return { success: true, password: userPassword };
       }
-      writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-      console.log(`Instance ${id} fully configured`);
-      return { success: true, password: userPassword };
+    }
+  } else {
+    // Immich
+    const isReady = await waitForInstance(instanceUrl);
+    
+    if (isReady) {
+      const setupResult = await setupImmichAdmin(instanceUrl, email, userPassword, quotaBytes);
+      if (setupResult.success) {
+        const metaPath = join(dir, 'metadata.json');
+        const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
+        meta.initialPassword = userPassword;
+        if (setupResult.apiKey) {
+          meta.immichApiKey = setupResult.apiKey;
+        }
+        writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+        console.log(`Immich instance ${id} fully configured`);
+        return { success: true, password: userPassword };
+      }
     }
   }
   

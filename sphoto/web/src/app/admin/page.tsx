@@ -15,8 +15,10 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Camera,
   CheckSquare,
   Clock4,
+  Cloud,
   Download,
   ExternalLink,
   Filter,
@@ -37,11 +39,14 @@ import Link from "next/link"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
 
+type Platform = "immich" | "nextcloud"
+
 interface Instance {
   id: string
   email: string
   plan: "Basic" | "Pro" | string
   storage_gb: number
+  platform?: Platform
   status: "active" | "stopped" | "deleted"
   created: string
   stopped_at?: string
@@ -786,6 +791,7 @@ export default function AdminPage() {
                         </button>
                       </th>
                       <th className="pb-3">Subdomain</th>
+                      <th className="pb-3">Plattform</th>
                       <th className="pb-3">Plan</th>
                       <th className="pb-3">Speicher</th>
                       <th className="pb-3">Status</th>
@@ -799,6 +805,7 @@ export default function AdminPage() {
                       const canStop = instance.status === "active"
                       const canStart = instance.status === "stopped"
                       const isSelected = selectedIds.has(instance.id)
+                      const isNextcloud = instance.platform === "nextcloud"
                       return (
                         <tr key={instance.id} className={`border-b last:border-0 ${isSelected ? "bg-primary/5" : ""}`}>
                           <td className="py-3 pr-2">
@@ -822,6 +829,16 @@ export default function AdminPage() {
                             <div className="flex items-center gap-2">
                               <p className="text-xs text-muted-foreground">{instance.email}</p>
                               <EmailButton email={instance.email} />
+                            </div>
+                          </td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-1.5">
+                              {isNextcloud ? (
+                                <Cloud className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <Camera className="h-4 w-4 text-primary" />
+                              )}
+                              <span className="text-sm">{isNextcloud ? "Nextcloud" : "Immich"}</span>
                             </div>
                           </td>
                           <td className="py-3">

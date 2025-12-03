@@ -4,7 +4,7 @@
 
 import Stripe from 'stripe';
 import type { Request, Response } from 'express';
-import type { SessionStatus } from './types';
+import type { SessionStatus, Platform } from './types';
 import { env, PLANS } from './config';
 import { generateId, createInstance } from './instances';
 import { sendWelcomeEmail, sendPaymentFailedEmail } from './email';
@@ -44,7 +44,10 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
           }
         }
         
-        console.log(`Session mode: ${session.mode}, email: ${customerEmail}`);
+        // Get platform from metadata (default to immich)
+        const platform = (session.metadata?.platform as Platform) || 'immich';
+        
+        console.log(`Session mode: ${session.mode}, email: ${customerEmail}, platform: ${platform}`);
         
         sessionStatus.set(sessionId, { status: 'processing', message: 'Erstelle deine Cloud...' });
         
@@ -61,18 +64,18 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
             const customSubdomain = session.metadata?.subdomain;
             const id = customSubdomain || generateId(customerEmail);
             
-            console.log(`Creating instance ${id} for ${customerEmail}`);
+            console.log(`Creating ${platform} instance ${id} for ${customerEmail}`);
             sessionStatus.set(sessionId, { status: 'processing', message: 'Container werden gestartet...' });
             
             sessionStatus.set(sessionId, { status: 'processing', message: 'Warte auf SSL-Zertifikat...' });
-            const result = await createInstance(id, customerEmail, plan);
+            const result = await createInstance(id, customerEmail, plan, platform);
             
             await stripe.customers.update(session.customer as string, {
-              metadata: { sphoto_id: id }
+              metadata: { sphoto_id: id, platform }
             });
             
             sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
-            await sendWelcomeEmail(customerEmail, id, plan.name, plan.storage, result.password);
+            await sendWelcomeEmail(customerEmail, id, plan.name, plan.storage, result.password, platform);
             
             sessionStatus.set(sessionId, { 
               status: 'complete', 
@@ -80,10 +83,11 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
               instanceUrl: `https://${id}.${env.DOMAIN}`,
               email: customerEmail,
               plan: plan.name,
+              platform,
               autoSetup: result.success
             });
             
-            console.log(`Instance ${id} created for ${customerEmail}`);
+            console.log(`${platform} instance ${id} created for ${customerEmail}`);
           } else {
             sessionStatus.set(sessionId, { 
               status: 'error', 
@@ -145,9 +149,15 @@ export async function getSessionStatus(sessionId: string): Promise<SessionStatus
 
 export async function createCheckoutSession(
   plan: 'basic' | 'pro', 
-  subdomain?: string
+  subdomain?: string,
+  platform: Platform = 'immich'
 ): Promise<string> {
   const priceId = plan === 'pro' ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_BASIC;
+  
+  const metadata: Record<string, string> = { platform };
+  if (subdomain) {
+    metadata.subdomain = subdomain;
+  }
   
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -155,7 +165,7 @@ export async function createCheckoutSession(
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `https://${env.DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `https://${env.DOMAIN}`,
-    metadata: subdomain ? { subdomain } : {},
+    metadata,
   });
   
   return session.url!;

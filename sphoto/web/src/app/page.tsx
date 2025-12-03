@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle,
+  Cloud,
   Loader2,
   Lock,
   Map,
@@ -27,10 +28,42 @@ import {
   Upload,
   Users,
   XCircle,
+  Camera,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+
+type Platform = "immich" | "nextcloud"
+
+const platformInfo = {
+  immich: {
+    name: "Immich",
+    icon: Camera,
+    description: "KI-gestützte Foto-Cloud mit Gesichtserkennung",
+    color: "text-primary",
+    features: [
+      "KI-Gesichtserkennung",
+      "Automatische Backups",
+      "iOS & Android Apps",
+      "Objekterkennung",
+      "Fotos auf Weltkarte",
+    ],
+  },
+  nextcloud: {
+    name: "Nextcloud",
+    icon: Cloud,
+    description: "Komplette Cloud-Lösung für Dateien, Kalender & mehr",
+    color: "text-blue-500",
+    features: [
+      "Datei-Synchronisation",
+      "Kalender & Kontakte",
+      "Office-Integration",
+      "Desktop & Mobile Apps",
+      "Collaboration Tools",
+    ],
+  },
+}
 
 const features = [
   {
@@ -133,6 +166,7 @@ export default function Home() {
   const [subdomain, setSubdomain] = useState("")
   const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle")
   const [statusMessage, setStatusMessage] = useState("")
+  const [platform, setPlatform] = useState<Platform>("immich")
 
   useEffect(() => {
     if (!subdomain) {
@@ -174,7 +208,6 @@ export default function Home() {
   }, [subdomain])
 
   const checkoutDisabled = subdomainStatus !== "available"
-  const _subdomainUrl = useMemo(() => (subdomain ? `${subdomain}.${DOMAIN}` : ""), [subdomain])
 
   const renderStatusIcon = () => {
     if (subdomainStatus === "checking") return <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
@@ -185,8 +218,11 @@ export default function Home() {
 
   const handleCheckout = (plan: "basic" | "pro") => {
     if (checkoutDisabled) return
-    window.location.href = `${API_URL}/checkout/${plan}?subdomain=${subdomain}`
+    window.location.href = `${API_URL}/checkout/${plan}?subdomain=${subdomain}&platform=${platform}`
   }
+
+  const currentPlatform = platformInfo[platform]
+  const PlatformIcon = currentPlatform.icon
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -346,11 +382,60 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Subdomain Picker */}
-            <div className="mx-auto mt-12 max-w-md">
+            {/* Platform Selection */}
+            <div className="mx-auto mt-12 max-w-2xl">
               <Card className="border-primary/20 shadow-lg">
                 <CardHeader className="text-center">
-                  <CardTitle>Wähle deine Subdomain</CardTitle>
+                  <CardTitle>Wähle deine Plattform</CardTitle>
+                  <CardDescription>Beide Plattformen nutzen den gleichen Speicherplatz</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(["immich", "nextcloud"] as Platform[]).map((p) => {
+                      const info = platformInfo[p]
+                      const Icon = info.icon
+                      const isSelected = platform === p
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPlatform(p)}
+                          className={`relative rounded-lg border-2 p-4 text-left transition-all ${
+                            isSelected 
+                              ? "border-primary bg-primary/5" 
+                              : "border-muted hover:border-muted-foreground/30"
+                          }`}
+                        >
+                          {isSelected && (
+                            <div className="absolute -top-2 -right-2">
+                              <CheckCircle className="h-5 w-5 text-primary fill-primary/20" />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 mb-2">
+                            <Icon className={`h-6 w-6 ${info.color}`} />
+                            <span className="font-semibold">{info.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">{info.description}</p>
+                          <ul className="space-y-1">
+                            {info.features.slice(0, 3).map((f) => (
+                              <li key={f} className="flex items-center gap-2 text-xs">
+                                <Check className="h-3 w-3 text-green-500" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Subdomain Picker */}
+            <div className="mx-auto mt-6 max-w-md">
+              <Card className="border-muted shadow-md">
+                <CardHeader className="text-center pb-2">
+                  <CardTitle className="text-lg">Wähle deine Subdomain</CardTitle>
                   <CardDescription>Jede Instanz läuft isoliert unter eigener URL</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -387,6 +472,10 @@ export default function Home() {
                     </div>
                   )}
                   <CardHeader className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <PlatformIcon className={`h-5 w-5 ${currentPlatform.color}`} />
+                      <span className="text-sm font-medium text-muted-foreground">{currentPlatform.name}</span>
+                    </div>
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <CardDescription>{plan.description}</CardDescription>
                     <div className="mt-4">

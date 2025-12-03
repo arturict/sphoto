@@ -58,6 +58,12 @@ app.get('/subdomain/check/:subdomain', (req: Request, res: Response) => {
 app.get('/checkout/:plan', async (req: Request, res: Response) => {
   const plan = req.params.plan as 'basic' | 'pro';
   const subdomain = (req.query.subdomain as string)?.toLowerCase();
+  const platform = (req.query.platform as 'immich' | 'nextcloud') || 'immich';
+  
+  // Validate platform
+  if (!['immich', 'nextcloud'].includes(platform)) {
+    return res.status(400).send('Ungültige Plattform');
+  }
   
   // Validate subdomain if provided
   if (subdomain) {
@@ -74,7 +80,7 @@ app.get('/checkout/:plan', async (req: Request, res: Response) => {
   }
   
   try {
-    const url = await createCheckoutSession(plan, subdomain);
+    const url = await createCheckoutSession(plan, subdomain, platform);
     res.redirect(303, url);
   } catch (err) {
     console.error('Checkout error:', err);

@@ -2,6 +2,8 @@
 // Type Definitions
 // =============================================================================
 
+export type Platform = 'immich' | 'nextcloud';
+
 export interface Plan {
   name: string;
   storage: number; // in GB
@@ -24,11 +26,13 @@ export interface InstanceMetadata {
   email: string;
   plan: string;
   storage_gb: number;
+  platform: Platform;
   created: string;
   status: 'active' | 'stopped' | 'deleted';
   initialPassword?: string;
   stopped_at?: string;
   immichApiKey?: string;
+  nextcloudAdminUser?: string;
   branding?: BrandingSettings;
 }
 
@@ -56,6 +60,7 @@ export interface SessionStatus {
   instanceUrl?: string;
   email?: string;
   plan?: string;
+  platform?: Platform;
   autoSetup?: boolean;
 }
 
