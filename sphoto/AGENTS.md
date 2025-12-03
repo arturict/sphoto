@@ -42,6 +42,14 @@ docker compose up -d --build automation
 # Stop all services
 docker compose down
 
+# =============================================================================
+# DEPLOYMENT ON VM (after git push)
+# =============================================================================
+# SSH into VM, then run:
+cd /opt/sphoto/sphoto
+git pull
+docker compose up -d --build automation web
+
 # Run automation server locally (requires Bun)
 cd automation
 bun install
