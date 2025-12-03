@@ -18,6 +18,11 @@ export const env: Env = {
 
 export const INSTANCES_DIR = '/data/instances';
 
+// External storage path for media files (photos/videos)
+// If not set, media is stored locally in each instance's uploads folder
+// Example: /mnt/nas/sphoto or /mnt/hdd/sphoto
+export const EXTERNAL_STORAGE_PATH = process.env.EXTERNAL_STORAGE_PATH || '';
+
 export const PLANS: Plans = {
   [env.STRIPE_PRICE_BASIC]: { name: 'Basic', storage: 200 },
   [env.STRIPE_PRICE_PRO]: { name: 'Pro', storage: 1000 },

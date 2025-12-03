@@ -75,9 +75,11 @@ services:
       - EMAIL_FROM=${EMAIL_FROM}
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - IMMICH_VERSION=${IMMICH_VERSION:-release}
+      - EXTERNAL_STORAGE_PATH=${EXTERNAL_STORAGE_PATH:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/instances:/data/instances
+      - ${EXTERNAL_STORAGE_PATH:-/data/instances}:${EXTERNAL_STORAGE_PATH:-/data/instances}
     networks:
       - sphoto-net
     restart: always

@@ -8,7 +8,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { InstanceMetadata, CreateInstanceResult, Plan } from './types';
-import { env, INSTANCES_DIR } from './config';
+import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
 
 const execAsync = promisify(exec);
 
@@ -148,7 +148,24 @@ export async function createInstance(
   console.log(`Creating instance: ${id} for ${email}`);
   
   const dir = join(INSTANCES_DIR, id);
-  mkdirSync(join(dir, 'uploads'), { recursive: true });
+  
+  // Determine upload path: external storage or local
+  let uploadsPath: string;
+  let uploadsVolume: string;
+  
+  if (EXTERNAL_STORAGE_PATH) {
+    // Use external storage (NAS/HDD)
+    uploadsPath = join(EXTERNAL_STORAGE_PATH, id, 'uploads');
+    uploadsVolume = `${uploadsPath}:/data`;
+    mkdirSync(uploadsPath, { recursive: true });
+    console.log(`Using external storage: ${uploadsPath}`);
+  } else {
+    // Use local storage (default)
+    uploadsPath = join(dir, 'uploads');
+    uploadsVolume = './uploads:/data';
+    mkdirSync(uploadsPath, { recursive: true });
+  }
+  
   mkdirSync(join(dir, 'db'), { recursive: true });
 
   const dbPass = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
@@ -167,7 +184,7 @@ services:
       - REDIS_HOSTNAME=redis
       - MACHINE_LEARNING_URL=http://sphoto-ml:3003
     volumes:
-      - ./uploads:/data
+      - ${uploadsVolume}
     depends_on:
       - db
       - redis
