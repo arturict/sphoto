@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -139,7 +140,7 @@ function SuccessContent() {
         </CardHeader>
         <CardContent className="text-center">
           <Button className="mt-2" asChild>
-            <a href="/">Zur Startseite</a>
+            <Link href="/">Zur Startseite</Link>
           </Button>
         </CardContent>
       </Card>

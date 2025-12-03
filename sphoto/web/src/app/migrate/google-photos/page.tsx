@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ArrowRight, CheckCircle, Download, ExternalLink, Key, Terminal, Upload, Sparkles } from "lucide-react"
+import { ArrowLeft, ArrowRight, CheckCircle, ExternalLink, Key, Sparkles } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Von Google Photos wechseln | SPhoto",
@@ -99,9 +99,9 @@ export default function GooglePhotosMigrationPage() {
                 <CardContent className="space-y-4">
                   <ol className="list-decimal space-y-2 pl-6">
                     <li>Gehe zu <a href="https://takeout.google.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google Takeout <ExternalLink className="inline h-3 w-3" /></a></li>
-                    <li>Klicke auf <strong>"Auswahl aufheben"</strong></li>
+                    <li>Klicke auf <strong>&quot;Auswahl aufheben&quot;</strong></li>
                     <li>Scrolle nach unten und wähle nur <strong>Google Fotos</strong> aus</li>
-                    <li>Klicke auf "Alle Fotoalben enthalten" (optional) um bestimmte Alben auszuwählen</li>
+                    <li>Klicke auf &quot;Alle Fotoalben enthalten&quot; (optional) um bestimmte Alben auszuwählen</li>
                     <li>Klicke auf <strong>Nächster Schritt</strong></li>
                     <li>Wähle:
                       <ul className="ml-6 mt-1 list-disc text-muted-foreground">
@@ -258,7 +258,7 @@ export default function GooglePhotosMigrationPage() {
                   <ol className="list-decimal space-y-2 pl-6">
                     <li>Öffne ein Terminal im Ordner, wo immich-go und deine Takeout-Dateien liegen:
                       <ul className="ml-6 mt-1 list-disc text-muted-foreground">
-                        <li><strong>Windows:</strong> Rechtsklick auf den Ordner → "Im Terminal öffnen"</li>
+                        <li><strong>Windows:</strong> Rechtsklick auf den Ordner → &quot;Im Terminal öffnen&quot;</li>
                         <li><strong>macOS:</strong> Öffne die Terminal-App, tippe <code className="rounded bg-muted px-1">cd </code> gefolgt von einem Leerzeichen, ziehe den Ordner ins Terminal und drücke Enter</li>
                       </ul>
                     </li>

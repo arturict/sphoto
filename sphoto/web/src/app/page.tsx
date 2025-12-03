@@ -17,16 +17,10 @@ import {
   ArrowRight,
   Check,
   CheckCircle,
-  Cloud,
-  Cpu,
-  Database,
-  Globe,
-  Heart,
   Loader2,
   Lock,
   Map,
   Search,
-  Shield,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -180,7 +174,7 @@ export default function Home() {
   }, [subdomain])
 
   const checkoutDisabled = subdomainStatus !== "available"
-  const subdomainUrl = useMemo(() => (subdomain ? `${subdomain}.${DOMAIN}` : ""), [subdomain])
+  const _subdomainUrl = useMemo(() => (subdomain ? `${subdomain}.${DOMAIN}` : ""), [subdomain])
 
   const renderStatusIcon = () => {
     if (subdomainStatus === "checking") return <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
