@@ -153,7 +153,7 @@ export async function createCheckoutSession(
     mode: 'subscription',
     payment_method_types: ['card'],
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `https://${env.DOMAIN}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `https://${env.DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `https://${env.DOMAIN}`,
     metadata: subdomain ? { subdomain } : {},
   });
