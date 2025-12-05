@@ -107,6 +107,7 @@ export interface Env {
   EMAIL_FROM: string;
   ADMIN_API_KEY: string;
   IMMICH_VERSION: string;
+  ADMIN_EMAIL: string;
 }
 
 export interface DailyStats {

@@ -615,6 +615,30 @@ export default function AdminPage() {
             <p className="text-sm text-muted-foreground">Managed Immich Instanzen</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link href="/admin/health">
+              <Button variant="outline" size="sm">
+                <Activity className="mr-2 h-4 w-4" />
+                Health
+              </Button>
+            </Link>
+            <Link href="/admin/alerts">
+              <Button variant="outline" size="sm">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Alerts
+              </Button>
+            </Link>
+            <Link href="/admin/maintenance">
+              <Button variant="outline" size="sm">
+                <Server className="mr-2 h-4 w-4" />
+                Wartung
+              </Button>
+            </Link>
+            <Link href="/admin/plans">
+              <Button variant="outline" size="sm">
+                <HardDrive className="mr-2 h-4 w-4" />
+                Pläne
+              </Button>
+            </Link>
             <Link href="/admin/branding">
               <Button variant="outline" size="sm">
                 <Palette className="mr-2 h-4 w-4" />

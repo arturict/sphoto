@@ -14,6 +14,7 @@ export const env: Env = {
   EMAIL_FROM: process.env.EMAIL_FROM || 'SPhoto <noreply@arturf.ch>',
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || '',
   IMMICH_VERSION: process.env.IMMICH_VERSION || 'release',
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@arturf.ch',
 };
 
 export const INSTANCES_DIR = '/data/instances';
@@ -22,6 +23,13 @@ export const INSTANCES_DIR = '/data/instances';
 // If not set, media is stored locally in each instance's uploads folder
 // Example: /mnt/nas/sphoto or /mnt/hdd/sphoto
 export const EXTERNAL_STORAGE_PATH = process.env.EXTERNAL_STORAGE_PATH || '';
+
+// Coolify mode: use 'coolify' network instead of 'sphoto-net'
+// and use Coolify's Traefik labels format
+export const COOLIFY_MODE = process.env.COOLIFY_MODE === 'true';
+
+// Network name based on mode
+export const NETWORK_NAME = COOLIFY_MODE ? 'coolify' : 'sphoto-net';
 
 export const PLANS: Plans = {
   [env.STRIPE_PRICE_BASIC]: { name: 'Basic', storage: 200 },
