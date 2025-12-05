@@ -3,6 +3,7 @@
 // =============================================================================
 
 export type Platform = 'immich' | 'nextcloud';
+export type UserTier = 'free' | 'basic' | 'pro';
 
 export interface Plan {
   name: string;
@@ -34,6 +35,67 @@ export interface InstanceMetadata {
   immichApiKey?: string;
   nextcloudAdminUser?: string;
   branding?: BrandingSettings;
+  // Custom storage path for this instance (overrides EXTERNAL_STORAGE_PATH)
+  storagePath?: string;
+}
+
+// =============================================================================
+// Shared Instance Types (for 2-instance deployment mode)
+// =============================================================================
+
+export interface SharedUser {
+  id: string;                    // Our internal ID
+  visibleId: string;             // User-friendly ID for URLs (derived from email)
+  email: string;
+  immichUserId: string;          // Immich's internal user ID
+  tier: UserTier;                // 'free', 'basic', 'pro'
+  instance: 'free' | 'paid';     // Which shared instance they're on
+  quotaGB: number;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  created: string;
+  status: 'active' | 'disabled' | 'pending_deletion' | 'deleted';
+  lastExportAt?: string;
+  // Deletion scheduling
+  deletionRequestedAt?: string;  // When user requested deletion
+  deletionScheduledFor?: string; // When deletion will happen (2 weeks later)
+  // Portal authentication
+  portalToken?: string;          // Token for user portal access
+  portalTokenExpiresAt?: string;
+}
+
+export interface SharedUserCreateResult {
+  success: boolean;
+  user?: SharedUser;
+  password?: string;
+  error?: string;
+}
+
+export interface SharedUserMigrationResult {
+  success: boolean;
+  message: string;
+  oldInstance?: 'free' | 'paid';
+  newInstance?: 'free' | 'paid';
+}
+
+export interface ImmichUserCreateDto {
+  email: string;
+  password: string;
+  name: string;
+  quotaSizeInBytes?: number;
+  shouldChangePassword?: boolean;
+}
+
+export interface ImmichUserResponse {
+  id: string;
+  email: string;
+  name: string;
+  isAdmin: boolean;
+  quotaSizeInBytes: number | null;
+  quotaUsageInBytes: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ExportJob {
@@ -61,6 +123,7 @@ export interface SessionStatus {
   email?: string;
   plan?: string;
   platform?: Platform;
+  tier?: UserTier;
   autoSetup?: boolean;
 }
 

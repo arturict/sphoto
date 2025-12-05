@@ -601,3 +601,134 @@ export async function getDirectorySize(dirPath: string): Promise<number> {
   await walkDir(dirPath);
   return totalSize;
 }
+
+// =============================================================================
+// Storage Migration
+// =============================================================================
+
+export interface StorageMigrationResult {
+  success: boolean;
+  message: string;
+  oldPath?: string;
+  newPath?: string;
+  bytesMoved?: number;
+}
+
+export async function getInstanceStoragePath(id: string): Promise<string | null> {
+  const instance = getInstance(id);
+  if (!instance) return null;
+  
+  // Check for custom storage path first
+  if (instance.storagePath) {
+    return join(instance.storagePath, id, 'uploads');
+  }
+  
+  // Fall back to global external storage or local
+  if (EXTERNAL_STORAGE_PATH) {
+    return join(EXTERNAL_STORAGE_PATH, id, 'uploads');
+  }
+  
+  return join(INSTANCES_DIR, id, 'uploads');
+}
+
+export async function migrateInstanceStorage(
+  id: string,
+  newStoragePath: string
+): Promise<StorageMigrationResult> {
+  const instance = getInstance(id);
+  if (!instance) {
+    return { success: false, message: 'Instance not found' };
+  }
+  
+  const dir = join(INSTANCES_DIR, id);
+  const metaPath = join(dir, 'metadata.json');
+  
+  // Determine current storage path
+  let currentPath: string;
+  if (instance.storagePath) {
+    currentPath = join(instance.storagePath, id, 'uploads');
+  } else if (EXTERNAL_STORAGE_PATH) {
+    currentPath = join(EXTERNAL_STORAGE_PATH, id, 'uploads');
+  } else {
+    currentPath = join(dir, 'uploads');
+  }
+  
+  const newPath = join(newStoragePath, id, 'uploads');
+  
+  // Don't migrate if paths are the same
+  if (currentPath === newPath) {
+    return { success: false, message: 'Source and destination paths are identical' };
+  }
+  
+  // Check if source exists
+  if (!existsSync(currentPath)) {
+    return { success: false, message: `Source path does not exist: ${currentPath}` };
+  }
+  
+  try {
+    // Stop the instance first
+    console.log(`Stopping instance ${id} for storage migration...`);
+    await stopInstance(id);
+    
+    // Create destination directory
+    mkdirSync(newPath, { recursive: true });
+    
+    // Get size before migration
+    const bytesMoved = await getDirectorySize(currentPath);
+    
+    // Move files using rsync for reliability
+    console.log(`Moving files from ${currentPath} to ${newPath}...`);
+    await execAsync(`rsync -av --remove-source-files "${currentPath}/" "${newPath}/"`);
+    
+    // Clean up empty directories in source
+    await execAsync(`find "${currentPath}" -type d -empty -delete 2>/dev/null || true`);
+    
+    // Update docker-compose.yml with new volume path
+    const composePath = join(dir, 'docker-compose.yml');
+    let composeContent = readFileSync(composePath, 'utf-8');
+    
+    // Determine the container mount point based on platform
+    const mountPoint = instance.platform === 'nextcloud' 
+      ? '/var/www/html/data' 
+      : '/data';
+    
+    // Replace the volume mapping (handles both relative and absolute paths)
+    const volumeRegex = new RegExp(`- [^:]+:${mountPoint}`, 'g');
+    composeContent = composeContent.replace(volumeRegex, `- ${newPath}:${mountPoint}`);
+    
+    writeFileSync(composePath, composeContent);
+    
+    // Update metadata with new storage path
+    const meta: InstanceMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
+    meta.storagePath = newStoragePath;
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    
+    // Restart the instance
+    console.log(`Starting instance ${id} with new storage path...`);
+    await startInstance(id);
+    
+    console.log(`Storage migration complete for ${id}: ${currentPath} -> ${newPath}`);
+    
+    return {
+      success: true,
+      message: 'Storage migration completed successfully',
+      oldPath: currentPath,
+      newPath,
+      bytesMoved
+    };
+  } catch (err) {
+    console.error(`Storage migration failed for ${id}:`, err);
+    
+    // Try to restart the instance even if migration failed
+    try {
+      await startInstance(id);
+    } catch {
+      console.error(`Failed to restart instance ${id} after migration failure`);
+    }
+    
+    return {
+      success: false,
+      message: `Migration failed: ${(err as Error).message}`
+    };
+  }
+}

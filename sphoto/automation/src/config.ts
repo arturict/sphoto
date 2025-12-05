@@ -31,6 +31,40 @@ export const COOLIFY_MODE = process.env.COOLIFY_MODE === 'true';
 // Network name based on mode
 export const NETWORK_NAME = COOLIFY_MODE ? 'coolify' : 'sphoto-net';
 
+// =============================================================================
+// Deployment Mode Configuration
+// =============================================================================
+// 'siloed' = One instance per user (original behavior)
+// 'shared' = Two shared instances (free + paid)
+export type DeploymentMode = 'siloed' | 'shared';
+export const DEPLOYMENT_MODE: DeploymentMode = (process.env.DEPLOYMENT_MODE as DeploymentMode) || 'shared';
+
+// Shared instance configuration (used when DEPLOYMENT_MODE = 'shared')
+export const SHARED_INSTANCES = {
+  free: {
+    subdomain: 'free',
+    url: `https://free.${env.DOMAIN}`,
+    internalUrl: process.env.SHARED_FREE_INTERNAL_URL || `http://sphoto-free-server:2283`,
+    apiKey: process.env.SHARED_FREE_API_KEY || '',
+    hasML: false,
+    defaultQuotaGB: 5,
+  },
+  paid: {
+    subdomain: 'photos',
+    url: `https://photos.${env.DOMAIN}`,
+    internalUrl: process.env.SHARED_PAID_INTERNAL_URL || `http://sphoto-paid-server:2283`,
+    apiKey: process.env.SHARED_PAID_API_KEY || '',
+    hasML: true,
+    defaultQuotaGB: 200, // Basic plan default
+  },
+};
+
+// Free tier configuration
+export const FREE_TIER = {
+  quotaGB: 5,
+  name: 'Free',
+};
+
 export const PLANS: Plans = {
   [env.STRIPE_PRICE_BASIC]: { name: 'Basic', storage: 200 },
   [env.STRIPE_PRICE_PRO]: { name: 'Pro', storage: 1000 },
@@ -38,5 +72,6 @@ export const PLANS: Plans = {
 
 export const RESERVED_SUBDOMAINS = [
   'www', 'api', 'admin', 'stats', 'mail', 'smtp', 
-  'ftp', 'ssh', 'test', 'dev', 'staging', 'app'
+  'ftp', 'ssh', 'test', 'dev', 'staging', 'app',
+  'free', 'photos', 'pro', 'paid' // Reserved for shared instances
 ];

@@ -6,14 +6,51 @@ Selbst-gehostete Foto-Speicherung basierend auf [Immich](https://github.com/immi
 
 ## 📋 Pläne
 
-| Plan | Speicher | Preis |
-|------|----------|-------|
-| **Basic** | 200 GB | CHF 5.-/Monat |
-| **Pro** | 1 TB | CHF 15.-/Monat |
+| Plan | Speicher | Preis | ML Features |
+|------|----------|-------|-------------|
+| **Free** | 5 GB | Kostenlos | ❌ |
+| **Basic** | 200 GB | CHF 5.-/Monat | ✅ |
+| **Pro** | 1 TB | CHF 15.-/Monat | ✅ |
 
 ---
 
-## 🚀 Schnellstart
+## 🚀 Deployment Modes
+
+SPhoto supports two deployment architectures:
+
+### Shared Mode (Recommended for most users)
+
+Two shared Immich instances serve all users:
+- `free.sphoto.arturf.ch` - Free tier (5GB, no ML)
+- `photos.sphoto.arturf.ch` - Paid tiers (200GB-1TB, with ML)
+
+**Benefits:**
+- Much lower resource usage (~2GB RAM total vs ~1GB per user)
+- Easier to manage
+- Supports free tier
+
+**Set in `.env`:**
+```bash
+DEPLOYMENT_MODE=shared
+```
+
+### Siloed Mode (Original)
+
+Each paying customer gets their own isolated Immich instance with dedicated database and Redis.
+
+**Benefits:**
+- Complete data isolation
+- Per-customer customization
+- No noisy neighbor issues
+
+**Set in `.env`:**
+```bash
+DEPLOYMENT_MODE=siloed
+```
+
+---
+
+## 🚀 Schnellstart (Shared Mode)
 
 ### Voraussetzungen
 
@@ -39,64 +76,55 @@ nano .env
 **Pflichtfelder in `.env`:**
 
 ```bash
-# =============================================================================
-# 🔐 ADMIN LOGIN (für admin.* und stats.* URLs)
-# =============================================================================
+# Deployment mode
+DEPLOYMENT_MODE=shared
+
+# Admin credentials
 ADMIN_USER=admin
 ADMIN_PASS=dein_sicheres_passwort
-
-# Traefik Auth Hash generieren:
-docker run --rm httpd:alpine htpasswd -nb admin dein_sicheres_passwort
-# Output kopieren (z.B. admin:$apr1$xyz...)
-TRAEFIK_AUTH=admin:$apr1$HIER_DEN_HASH
-
-# API Key für curl/Scripts:
 ADMIN_API_KEY=$(openssl rand -hex 32)
 
-# =============================================================================
-# 💳 Stripe (von stripe.com/dashboard)
-# =============================================================================
+# Stripe
 STRIPE_SECRET_KEY=sk_live_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
-STRIPE_PRICE_BASIC=price_xxx      # 200GB, CHF 5
-STRIPE_PRICE_PRO=price_xxx        # 1TB, CHF 15
+STRIPE_PRICE_BASIC=price_xxx
+STRIPE_PRICE_PRO=price_xxx
 
-# =============================================================================
-# 📧 Resend (von resend.com)
-# =============================================================================
+# Resend
 RESEND_API_KEY=re_xxx
 ```
 
-### 3. Stripe einrichten
-
-1. **Gehe zu** [stripe.com/dashboard](https://dashboard.stripe.com)
-
-2. **Erstelle 2 Produkte:**
-   - `SPhoto Basic` → CHF 5.00/Monat, recurring
-   - `SPhoto Pro` → CHF 15.00/Monat, recurring
-
-3. **Kopiere die Price IDs** (beginnen mit `price_`)
-
-4. **Webhook erstellen:**
-   - URL: `https://api.sphoto.arturf.ch/webhook`
-   - Events auswählen:
-     - `checkout.session.completed`
-     - `invoice.paid`
-     - `invoice.payment_failed`
-     - `customer.subscription.deleted`
-
-5. **Webhook Secret kopieren** (beginnt mit `whsec_`)
-
-### 4. Resend einrichten
-
-1. **Gehe zu** [resend.com](https://resend.com)
-2. **API Key erstellen**
-3. **Domain verifizieren:** `arturf.ch`
-4. **API Key in `.env` eintragen**
-
-### 5. Starten
+### 3. Shared Instances starten
 
 ```bash
+# Start free tier instance
+cd instances/free
+cp .env.example .env
+# Edit .env with a secure DB_PASSWORD
+docker compose up -d
+
+# Start paid tier instance
+cd ../paid
+cp .env.example .env
+# Edit .env with a secure DB_PASSWORD
+docker compose up -d
+```
+
+### 4. Create admin users on both instances
+
+1. Visit `https://free.sphoto.arturf.ch` - Create admin account
+2. Visit `https://photos.sphoto.arturf.ch` - Create admin account
+3. On each instance: Account Settings → API Keys → Create key
+4. Add keys to `.env`:
+   ```bash
+   SHARED_FREE_API_KEY=your_free_instance_key
+   SHARED_PAID_API_KEY=your_paid_instance_key
+   ```
+
+### 5. Start main services
+
+```bash
+cd /opt/sphoto/sphoto
 docker compose up -d
 ```
 
@@ -106,17 +134,39 @@ docker compose up -d
 # Health Check
 curl https://api.sphoto.arturf.ch/health
 
-# Manuell Instanz erstellen (zum Testen)
-curl -X POST https://api.sphoto.arturf.ch/api/instances \
-  -H "x-api-key: DEIN_ADMIN_API_KEY" \
+# Check shared instances status
+curl https://api.sphoto.arturf.ch/api/shared/instances \
+  -H "x-api-key: DEIN_ADMIN_API_KEY"
+
+# Create a free user
+curl -X POST https://api.sphoto.arturf.ch/signup/free \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "plan": "basic"}'
+  -d '{"email": "test@example.com"}'
 ```
 
 ---
 
-## 🔄 Automatischer Ablauf
+## 🔄 Automatischer Ablauf (Shared Mode)
 
+### Free Tier
+```
+Kunde besucht sphoto.arturf.ch
+         ↓
+Klickt "Free - 5GB"
+         ↓
+POST /signup/free
+         ↓
+Automation Server:
+  • Erstellt User auf free.sphoto.arturf.ch
+  • Sendet E-Mail via Resend
+         ↓
+Kunde erhält:
+  "Deine Cloud: https://free.sphoto.arturf.ch"
+         ↓
+Fertig! 🎉
+```
+
+### Paid Tier
 ```
 Kunde besucht sphoto.arturf.ch
          ↓
@@ -127,12 +177,12 @@ Stripe Checkout
 Webhook → api.sphoto.arturf.ch/webhook
          ↓
 Automation Server:
-  • Generiert ID: "hans-x7k2"
-  • Erstellt Docker Container
+  • Erstellt User auf photos.sphoto.arturf.ch
+  • Setzt Quota (200GB/1TB)
   • Sendet E-Mail via Resend
          ↓
 Kunde erhält:
-  "Deine Cloud: https://hans-x7k2.sphoto.arturf.ch"
+  "Deine Cloud: https://photos.sphoto.arturf.ch"
          ↓
 Fertig! 🎉
 ```
@@ -151,34 +201,51 @@ Zeigt:
 
 ---
 
-## 🛠️ Verwaltung
+## 🛠️ Verwaltung (Shared Mode)
 
-### Alle Instanzen anzeigen
+### Alle Users anzeigen
 ```bash
-curl https://api.sphoto.arturf.ch/api/instances \
+curl https://api.sphoto.arturf.ch/api/shared/users \
   -H "x-api-key: DEIN_API_KEY"
 ```
 
-### Instanz stoppen
+### User Stats abrufen
 ```bash
-curl -X POST https://api.sphoto.arturf.ch/api/instances/KUNDE_ID/stop \
+curl https://api.sphoto.arturf.ch/api/shared/users/USER_ID/stats \
   -H "x-api-key: DEIN_API_KEY"
 ```
 
-### Instanz löschen
+### User Quota ändern
 ```bash
-curl -X DELETE https://api.sphoto.arturf.ch/api/instances/KUNDE_ID \
+curl -X PUT https://api.sphoto.arturf.ch/api/shared/users/USER_ID/quota \
+  -H "x-api-key: DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"quotaGB": 500}'
+```
+
+### User migrieren (Free → Paid)
+```bash
+curl -X POST https://api.sphoto.arturf.ch/api/shared/users/USER_ID/migrate \
+  -H "x-api-key: DEIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tier": "basic", "quotaGB": 200}'
+```
+
+### User löschen
+```bash
+curl -X DELETE https://api.sphoto.arturf.ch/api/shared/users/USER_ID?force=true \
   -H "x-api-key: DEIN_API_KEY"
 ```
 
-### Docker Stats
+### Shared Instances Status
 ```bash
-docker stats --format "table {{.Name}}\t{{.MemUsage}}" | grep sphoto
+curl https://api.sphoto.arturf.ch/api/shared/instances \
+  -H "x-api-key: DEIN_API_KEY"
 ```
 
 ---
 
-## 🏗️ Architektur
+## 🏗️ Architektur (Shared Mode)
 
 ```
                     *.sphoto.arturf.ch
@@ -197,20 +264,23 @@ docker stats --format "table {{.Name}}\t{{.MemUsage}}" | grep sphoto
 │  Page   │      │   Server     │     │  Dashboard   │
 └─────────┘      └──────────────┘     └──────────────┘
                          │
-         ┌───────────────┼───────────────┐
-         │               │               │
-         ▼               ▼               ▼
-   ┌──────────┐   ┌──────────┐   ┌──────────┐
-   │ Instanz  │   │ Instanz  │   │ Instanz  │
-   │  hans    │   │  maria   │   │  peter   │
-   └────┬─────┘   └────┬─────┘   └────┬─────┘
-        │              │              │
-        └──────────────┼──────────────┘
-                       ▼
-              ┌────────────────┐
-              │  Shared ML     │
-              │  (CPU, 16GB)   │
-              └────────────────┘
+         ┌───────────────┴───────────────┐
+         │                               │
+         ▼                               ▼
+┌─────────────────────┐     ┌─────────────────────┐
+│   FREE INSTANCE     │     │   PAID INSTANCE     │
+│ free.sphoto.arturf  │     │ photos.sphoto.arturf│
+│                     │     │                     │
+│ • 5GB quota         │     │ • 200GB-1TB quota   │
+│ • No ML             │     │ • Full ML features  │
+│ • Unlimited users   │     │ • Paying customers  │
+└─────────────────────┘     └──────────┬──────────┘
+                                       │
+                                       ▼
+                            ┌────────────────┐
+                            │  Shared ML     │
+                            │  (CPU, 16GB)   │
+                            └────────────────┘
 ```
 
 ---
@@ -220,6 +290,7 @@ docker stats --format "table {{.Name}}\t{{.MemUsage}}" | grep sphoto
 - **Kein Backup inkludiert** - Kunden müssen eigene Backups machen
 - **Homelab-Hosting** - Nicht für Enterprise geeignet
 - **AGPL-Lizenz** - Quellcode muss öffentlich bleiben
+- **Migration löscht Fotos** - Bei Free→Paid Migration müssen Nutzer Fotos erneut hochladen
 
 ---
 
