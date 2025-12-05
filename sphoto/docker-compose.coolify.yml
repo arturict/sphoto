@@ -96,7 +96,7 @@ services:
       - "traefik.http.routers.sphoto-stats-http.middlewares=redirect-to-https"
       # Service
       - "traefik.http.services.sphoto-stats.loadbalancer.server.port=3000"
-      # Basic Auth Middleware
+      # Basic Auth Middleware (note: TRAEFIK_AUTH must have $ escaped as $$ in the env value)
       - "traefik.http.middlewares.sphoto-stats-auth.basicauth.users=${TRAEFIK_AUTH}"
 
   # ===========================================================================
