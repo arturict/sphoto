@@ -32,7 +32,11 @@ const basicAuth = (req, res, next) => {
   return res.status(401).send('Invalid credentials');
 };
 
-// Apply auth to all routes
+// Apply auth to all routes except health
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(basicAuth);
 
 // =============================================================================
