@@ -39,7 +39,7 @@ services:
     build: ./automation
     container_name: sphoto-automation
     environment:
-      - DOMAIN=${DOMAIN}
+      - DOMAIN=sphoto.arturf.ch
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - STRIPE_PRICE_BASIC=${STRIPE_PRICE_BASIC}
@@ -65,13 +65,13 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTPS Router
-      - "traefik.http.routers.sphoto-api-https.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-api-https.rule=Host(`api.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-api-https.entryPoints=https"
       - "traefik.http.routers.sphoto-api-https.tls=true"
       - "traefik.http.routers.sphoto-api-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sphoto-api-https.service=sphoto-api"
       # HTTP Router (redirect)
-      - "traefik.http.routers.sphoto-api-http.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-api-http.rule=Host(`api.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-api-http.entryPoints=http"
       - "traefik.http.routers.sphoto-api-http.middlewares=redirect-to-https"
       # Service
@@ -102,14 +102,14 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTPS Router
-      - "traefik.http.routers.sphoto-stats-https.rule=Host(`stats.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-stats-https.rule=Host(`stats.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-stats-https.entryPoints=https"
       - "traefik.http.routers.sphoto-stats-https.tls=true"
       - "traefik.http.routers.sphoto-stats-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sphoto-stats-https.service=sphoto-stats"
       - "traefik.http.routers.sphoto-stats-https.middlewares=sphoto-stats-auth"
       # HTTP Router (redirect)
-      - "traefik.http.routers.sphoto-stats-http.rule=Host(`stats.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-stats-http.rule=Host(`stats.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-stats-http.entryPoints=http"
       - "traefik.http.routers.sphoto-stats-http.middlewares=redirect-to-https"
       # Service
@@ -124,8 +124,8 @@ services:
     build: ./web
     container_name: sphoto-web
     environment:
-      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}
-      - NEXT_PUBLIC_DOMAIN=${DOMAIN}
+      - NEXT_PUBLIC_API_URL=https://api.sphoto.arturf.ch
+      - NEXT_PUBLIC_DOMAIN=sphoto.arturf.ch
       - NEXT_PUBLIC_DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-shared}
     networks:
       - coolify
@@ -139,13 +139,13 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTPS Router
-      - "traefik.http.routers.sphoto-web-https.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-web-https.rule=Host(`sphoto.arturf.ch`) || Host(`www.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-web-https.entryPoints=https"
       - "traefik.http.routers.sphoto-web-https.tls=true"
       - "traefik.http.routers.sphoto-web-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sphoto-web-https.service=sphoto-web"
       # HTTP Router (redirect)
-      - "traefik.http.routers.sphoto-web-http.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.sphoto-web-http.rule=Host(`sphoto.arturf.ch`) || Host(`www.sphoto.arturf.ch`)"
       - "traefik.http.routers.sphoto-web-http.entryPoints=http"
       - "traefik.http.routers.sphoto-web-http.middlewares=redirect-to-https"
       # Service
