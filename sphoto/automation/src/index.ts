@@ -3,14 +3,36 @@
 // =============================================================================
 
 import express, { type Request, type Response, type NextFunction } from 'express';
-import { env } from './config';
+import Stripe from 'stripe';
+import { env, DEPLOYMENT_MODE, SHARED_INSTANCES, FREE_TIER } from './config';
 import { handleWebhook, getSessionStatus, createCheckoutSession } from './stripe';
 import { checkSubdomain } from './subdomain';
-import { listInstances, getInstance, startInstance, stopInstance, deleteInstance } from './instances';
+import { listInstances, getInstance, startInstance, stopInstance, deleteInstance, migrateInstanceStorage, getInstanceStoragePath } from './instances';
 import { getBranding, updateBranding, deleteBranding, generateCustomCss } from './branding';
 import { startExport, getExportJob, getExportByToken, listExportJobs, cleanupExpiredExports } from './export';
 import { getAnalytics, runDailyStatsCollection } from './analytics';
-import { sendExportReadyEmail } from './email';
+import { sendExportReadyEmail, sendFreeWelcomeEmail, sendAccountDeletionEmail, sendAccountDeletionCancelledEmail } from './email';
+import {
+  createSharedUser,
+  getSharedUser,
+  getSharedUserByEmail,
+  listSharedUsers,
+  updateSharedUserQuota,
+  updateSharedUserTier,
+  deleteSharedUser,
+  migrateUserBetweenInstances,
+  getSharedUserStats,
+  checkSharedInstanceHealth,
+  getSharedInstanceStats,
+  requestAccountDeletion,
+  cancelAccountDeletion,
+  processScheduledDeletions,
+  listPendingDeletions,
+  createPortalSession,
+  validatePortalToken,
+  invalidatePortalToken,
+  getPortalData,
+} from './shared-users';
 import { 
   getAlertHistory, 
   updateAlertSettings, 
@@ -43,9 +65,10 @@ import {
   getHealthSummary,
   getInstanceHealth,
 } from './health';
-import type { BrandingSettings } from './types';
+import type { BrandingSettings, UserTier } from './types';
 
 const app = express();
+const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 // =============================================================================
 // CORS Middleware
@@ -53,7 +76,7 @@ const app = express();
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -72,7 +95,216 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    deploymentMode: DEPLOYMENT_MODE,
+  });
+});
+
+// =============================================================================
+// Free Tier Signup (Public - no auth needed)
+// =============================================================================
+app.post('/signup/free', async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Free tier only available in shared mode' });
+  }
+
+  const { email } = req.body;
+  
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  // Basic email validation
+  if (!email.includes('@') || !email.includes('.')) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  // Check if user already exists
+  const existing = getSharedUserByEmail(email);
+  if (existing) {
+    return res.status(409).json({ error: 'Email already registered' });
+  }
+
+  try {
+    const result = await createSharedUser(email, 'free', FREE_TIER.quotaGB);
+    
+    if (!result.success || !result.user) {
+      return res.status(500).json({ error: result.error || 'Failed to create account' });
+    }
+
+    // Send welcome email
+    if (result.password) {
+      await sendFreeWelcomeEmail(email, result.password);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created! Check your email for login details.',
+      instanceUrl: SHARED_INSTANCES.free.url,
+    });
+  } catch (err) {
+    console.error('Free signup error:', err);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+// =============================================================================
+// User Portal API (authenticated with portal token)
+// =============================================================================
+
+// Portal auth middleware
+const portalAuth = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid authorization header' });
+  }
+
+  const token = authHeader.slice(7);
+  const user = validatePortalToken(token);
+  
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  // Attach user to request
+  (req as any).portalUser = user;
+  next();
+};
+
+// Login to portal (sends magic link via email)
+app.post('/portal/login', async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Portal only available in shared mode' });
+  }
+
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const user = getSharedUserByEmail(email);
+  if (!user) {
+    // Don't reveal if email exists - just say "check your email"
+    return res.json({ success: true, message: 'If your account exists, check your email for login link.' });
+  }
+
+  const session = createPortalSession(user.visibleId);
+  if (!session.success || !session.token) {
+    return res.status(500).json({ error: 'Failed to create session' });
+  }
+
+  // TODO: Send magic link email
+  // For now, return token directly (development mode)
+  // In production, send email with: https://portal.sphoto.arturf.ch/auth?token=xxx
+  
+  // Send magic link email
+  const { sendPortalLoginEmail } = await import('./email');
+  await sendPortalLoginEmail(email, session.token);
+
+  res.json({ 
+    success: true, 
+    message: 'Check your email for login link.',
+    // Remove in production:
+    _devToken: process.env.NODE_ENV === 'development' ? session.token : undefined,
+  });
+});
+
+// Validate token and get user data
+app.post('/portal/auth', async (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  const user = validatePortalToken(token);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  res.json({ 
+    success: true, 
+    token,
+    userId: user.visibleId,
+  });
+});
+
+// Get portal dashboard data
+app.get('/portal/dashboard', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  
+  const result = await getPortalData(user.visibleId);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  res.json(result.data);
+});
+
+// Get Stripe Customer Portal URL
+app.get('/portal/billing', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+
+  if (!user.stripeCustomerId) {
+    return res.status(400).json({ 
+      error: 'No billing account linked',
+      canUpgrade: user.tier === 'free',
+    });
+  }
+
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `https://portal.${env.DOMAIN}`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Stripe portal error:', err);
+    res.status(500).json({ error: 'Failed to create billing session' });
+  }
+});
+
+// Request account deletion (2-week delay)
+app.post('/portal/delete-account', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+
+  const result = requestAccountDeletion(user.visibleId);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  // Send confirmation email
+  await sendAccountDeletionEmail(user.email, result.scheduledFor!);
+
+  res.json({
+    success: true,
+    message: 'Account deletion scheduled',
+    scheduledFor: result.scheduledFor,
+  });
+});
+
+// Cancel account deletion
+app.post('/portal/cancel-deletion', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+
+  const result = cancelAccountDeletion(user.visibleId);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  // Send confirmation email
+  await sendAccountDeletionCancelledEmail(user.email);
+
+  res.json({ success: true, message: 'Account deletion cancelled' });
+});
+
+// Logout
+app.post('/portal/logout', portalAuth, (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  invalidatePortalToken(user.visibleId);
+  res.json({ success: true });
 });
 
 // =============================================================================
@@ -245,24 +477,18 @@ app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Respons
   try {
     const instanceId = req.params.id;
     const { existsSync } = await import('fs');
-    const { join } = await import('path');
-    const { EXTERNAL_STORAGE_PATH, INSTANCES_DIR } = await import('./config');
     const { getDirectorySize } = await import('./instances');
     
-    // Determine upload path
-    let uploadsPath: string;
-    if (EXTERNAL_STORAGE_PATH) {
-      uploadsPath = join(EXTERNAL_STORAGE_PATH, instanceId, 'uploads');
-    } else {
-      uploadsPath = join(INSTANCES_DIR, instanceId, 'uploads');
-    }
+    // Use the helper function that respects per-instance storage paths
+    const uploadsPath = await getInstanceStoragePath(instanceId);
     
-    if (!existsSync(uploadsPath)) {
+    if (!uploadsPath || !existsSync(uploadsPath)) {
       return res.json({ 
         usage: 0, 
         photos: 0, 
         videos: 0,
-        usageByUser: [] 
+        usageByUser: [],
+        storagePath: uploadsPath || 'not configured'
       });
     }
     
@@ -272,7 +498,396 @@ app.get('/api/instances/:id/stats', adminAuth, async (req: Request, res: Respons
       usage, 
       photos: 0, // Can't determine without API
       videos: 0, // Can't determine without API
-      usageByUser: [] 
+      usageByUser: [],
+      storagePath: uploadsPath
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Storage Management API
+// =============================================================================
+app.get('/api/instances/:id/storage', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const instance = getInstance(req.params.id);
+    if (!instance) {
+      return res.status(404).json({ error: 'Instance not found' });
+    }
+    
+    const currentPath = await getInstanceStoragePath(req.params.id);
+    const { getDirectorySize } = await import('./instances');
+    const { existsSync } = await import('fs');
+    
+    let usage = 0;
+    if (currentPath && existsSync(currentPath)) {
+      usage = await getDirectorySize(currentPath);
+    }
+    
+    res.json({
+      instanceId: req.params.id,
+      platform: instance.platform,
+      storagePath: currentPath,
+      customPath: instance.storagePath || null,
+      usageBytes: usage,
+      usageGB: Math.round(usage / (1024 * 1024 * 1024) * 100) / 100,
+      quotaGB: instance.storage_gb
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/instances/:id/storage/migrate', adminAuth, async (req: Request, res: Response) => {
+  try {
+    const { newStoragePath } = req.body;
+    
+    if (!newStoragePath || typeof newStoragePath !== 'string') {
+      return res.status(400).json({ error: 'newStoragePath is required' });
+    }
+    
+    // Validate path format (must be absolute)
+    if (!newStoragePath.startsWith('/')) {
+      return res.status(400).json({ error: 'Storage path must be absolute (start with /)' });
+    }
+    
+    const result = await migrateInstanceStorage(req.params.id, newStoragePath);
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Shared Users API (for 2-instance deployment mode)
+// =============================================================================
+app.get('/api/shared/users', adminAuth, (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+  res.json(listSharedUsers());
+});
+
+app.get('/api/shared/users/:id', adminAuth, (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+  
+  const user = getSharedUser(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  res.json(user);
+});
+
+app.post('/api/shared/users', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { email, tier, quotaGB } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const validTiers: UserTier[] = ['free', 'basic', 'pro'];
+  if (tier && !validTiers.includes(tier)) {
+    return res.status(400).json({ error: 'Invalid tier. Must be free, basic, or pro' });
+  }
+
+  try {
+    const result = await createSharedUser(email, tier || 'free', quotaGB);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put('/api/shared/users/:id/quota', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { quotaGB } = req.body;
+  if (typeof quotaGB !== 'number' || quotaGB < 1) {
+    return res.status(400).json({ error: 'quotaGB must be a positive number' });
+  }
+
+  try {
+    const result = await updateSharedUserQuota(req.params.id, quotaGB);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put('/api/shared/users/:id/tier', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { tier, quotaGB } = req.body;
+  const validTiers: UserTier[] = ['free', 'basic', 'pro'];
+  
+  if (!validTiers.includes(tier)) {
+    return res.status(400).json({ error: 'Invalid tier. Must be free, basic, or pro' });
+  }
+
+  try {
+    const result = await updateSharedUserTier(req.params.id, tier, quotaGB);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post('/api/shared/users/:id/migrate', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { tier, quotaGB } = req.body;
+  const validTiers: UserTier[] = ['free', 'basic', 'pro'];
+  
+  if (!validTiers.includes(tier)) {
+    return res.status(400).json({ error: 'Invalid tier. Must be free, basic, or pro' });
+  }
+
+  try {
+    const result = await migrateUserBetweenInstances(req.params.id, tier, quotaGB);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.delete('/api/shared/users/:id', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const force = req.query.force === 'true';
+
+  try {
+    const result = await deleteSharedUser(req.params.id, force);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/shared/users/:id/stats', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await getSharedUserStats(req.params.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.stats);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Shared instances health and stats
+app.get('/api/shared/instances', adminAuth, async (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const [freeHealth, paidHealth, freeStats, paidStats] = await Promise.all([
+      checkSharedInstanceHealth('free'),
+      checkSharedInstanceHealth('paid'),
+      getSharedInstanceStats('free'),
+      getSharedInstanceStats('paid'),
+    ]);
+
+    res.json({
+      deploymentMode: DEPLOYMENT_MODE,
+      instances: {
+        free: {
+          url: SHARED_INSTANCES.free.url,
+          healthy: freeHealth.healthy,
+          healthMessage: freeHealth.message,
+          hasML: SHARED_INSTANCES.free.hasML,
+          stats: freeStats.success ? freeStats.stats : null,
+        },
+        paid: {
+          url: SHARED_INSTANCES.paid.url,
+          healthy: paidHealth.healthy,
+          healthMessage: paidHealth.message,
+          hasML: SHARED_INSTANCES.paid.hasML,
+          stats: paidStats.success ? paidStats.stats : null,
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Admin: List pending deletions
+app.get('/api/shared/deletions', adminAuth, (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+  res.json(listPendingDeletions());
+});
+
+// Admin: Process scheduled deletions
+app.post('/api/shared/deletions/process', adminAuth, async (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await processScheduledDeletions();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Admin: Immediately delete user (bypass 2-week delay)
+app.delete('/api/shared/users/:id/force', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await deleteSharedUser(req.params.id, true);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, message: 'User deleted immediately' });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Instance Upgrade API (Admin)
+// =============================================================================
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+const execAsync = promisify(exec);
+
+// Upgrade a shared instance
+app.post('/api/shared/instances/:instance/upgrade', adminAuth, async (req: Request, res: Response) => {
+  const instance = req.params.instance as 'free' | 'paid';
+  
+  if (!['free', 'paid'].includes(instance)) {
+    return res.status(400).json({ error: 'Invalid instance. Use "free" or "paid"' });
+  }
+
+  const instanceDir = `/data/instances/${instance}`;
+  
+  try {
+    console.log(`Starting upgrade for ${instance} instance...`);
+    
+    // Pull latest images and restart
+    const { stdout, stderr } = await execAsync(
+      `cd ${instanceDir} && docker compose pull && docker compose up -d`,
+      { timeout: 300000 } // 5 minute timeout
+    );
+    
+    console.log(`Upgrade output: ${stdout}`);
+    if (stderr) console.log(`Upgrade stderr: ${stderr}`);
+    
+    // Clean up old images
+    await execAsync('docker image prune -f');
+    
+    res.json({ 
+      success: true, 
+      message: `${instance} instance upgraded successfully`,
+      output: stdout,
+    });
+  } catch (err) {
+    console.error(`Upgrade error for ${instance}:`, err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Upgrade all shared instances
+app.post('/api/shared/instances/upgrade-all', adminAuth, async (_req: Request, res: Response) => {
+  try {
+    const results: Record<string, { success: boolean; message?: string; error?: string }> = {};
+    
+    for (const instance of ['free', 'paid'] as const) {
+      const instanceDir = `/data/instances/${instance}`;
+      
+      try {
+        console.log(`Upgrading ${instance} instance...`);
+        await execAsync(
+          `cd ${instanceDir} && docker compose pull && docker compose up -d`,
+          { timeout: 300000 }
+        );
+        results[instance] = { success: true, message: 'Upgraded successfully' };
+      } catch (err) {
+        results[instance] = { success: false, error: (err as Error).message };
+      }
+    }
+    
+    // Clean up old images
+    await execAsync('docker image prune -f');
+    
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get current Immich version
+app.get('/api/shared/instances/:instance/version', adminAuth, async (req: Request, res: Response) => {
+  const instance = req.params.instance as 'free' | 'paid';
+  
+  if (!['free', 'paid'].includes(instance)) {
+    return res.status(400).json({ error: 'Invalid instance. Use "free" or "paid"' });
+  }
+
+  const config = instance === 'free' ? SHARED_INSTANCES.free : SHARED_INSTANCES.paid;
+  
+  try {
+    const response = await fetch(`${config.internalUrl}/api/server/about`, {
+      headers: { 'x-api-key': config.apiKey },
+    });
+    
+    if (!response.ok) {
+      return res.status(500).json({ error: 'Failed to get version info' });
+    }
+    
+    const data = await response.json() as { version?: string; build?: string };
+    res.json({
+      instance,
+      version: data.version,
+      build: data.build,
     });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

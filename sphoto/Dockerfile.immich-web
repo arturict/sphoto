@@ -1,0 +1,28 @@
+# =============================================================================
+# SPhoto Custom Immich Web Build
+# =============================================================================
+# This Dockerfile builds a custom Immich web image with SPhoto billing button
+#
+# Build:
+#   docker build -t sphoto-immich-web -f Dockerfile.immich-web ..
+#
+# The resulting image should replace the stock Immich server image
+# =============================================================================
+
+FROM ghcr.io/immich-app/immich-server:release AS base
+
+# SPhoto environment variables
+ENV VITE_SPHOTO_ENABLED=true
+ENV VITE_SPHOTO_PORTAL_URL=https://portal.sphoto.arturf.ch
+
+# The web UI is baked into the server image, so we need to rebuild it
+# This is a simplified approach - for production, you'd want to rebuild from source
+
+# Note: The Immich server image includes the pre-built web UI
+# To customize it, you need to:
+# 1. Clone the full Immich repo
+# 2. Apply the web/ changes
+# 3. Build the entire image from source
+
+# For now, this Dockerfile just shows the intended configuration
+# See BUILDING.md for full build instructions

@@ -10,10 +10,8 @@ routing. The platform offers two plans: Basic (200 GB, CHF 5/month) and Pro (1 T
 - `automation/` — Bun/TypeScript API server handling Stripe webhooks, instance lifecycle, and
   admin endpoints.
 - `web/` — Next.js 15 frontend with landing page, checkout flow, success page, and admin dashboard.
-- `landing/` — Static HTML fallback pages (legacy landing, admin, success).
 - `stats/` — Express dashboard for viewing instance stats and Stripe revenue.
 - `instances/` — Runtime directory where per-customer docker-compose stacks are generated.
-- `admin/` — React/Vite admin dashboard with shadcn/ui (alternative to `/web/src/app/admin`).
 - `docker-compose.yml` — Orchestrates Traefik, ML service, automation, stats, and web containers.
 - `.env.example` — Template for required environment variables (Stripe, Resend, admin auth).
 - `instance-template.yml` — Docker Compose template used when provisioning new customer instances.

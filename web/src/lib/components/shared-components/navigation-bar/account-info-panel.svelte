@@ -8,7 +8,7 @@
   import { userInteraction } from '$lib/stores/user.svelte';
   import { getAboutInfo, type ServerAboutResponseDto } from '@immich/sdk';
   import { Button, Icon, IconButton, modalManager } from '@immich/ui';
-  import { mdiCog, mdiLogout, mdiPencil, mdiWrench } from '@mdi/js';
+  import { mdiCog, mdiLogout, mdiPencil, mdiWrench, mdiCreditCardOutline } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -22,6 +22,10 @@
   let { onLogout, onClose = () => {} }: Props = $props();
 
   let info: ServerAboutResponseDto | undefined = $state();
+  
+  // SPhoto portal URL - configurable via environment
+  const SPHOTO_PORTAL_URL = import.meta.env.VITE_SPHOTO_PORTAL_URL || 'https://portal.sphoto.arturf.ch';
+  const SPHOTO_ENABLED = import.meta.env.VITE_SPHOTO_ENABLED === 'true';
 
   onMount(async () => {
     info = userInteraction.aboutInfo ?? (await getAboutInfo());
@@ -90,6 +94,22 @@
           <div class="flex place-content-center place-items-center text-center gap-2 px-2">
             <Icon icon={mdiWrench} size="18" aria-hidden />
             {$t('administration')}
+          </div>
+        </Button>
+      {/if}
+      {#if SPHOTO_ENABLED}
+        <Button
+          href={SPHOTO_PORTAL_URL}
+          onclick={onClose}
+          shape="round"
+          variant="ghost"
+          size="small"
+          color="secondary"
+          class="border dark:border-immich-dark-gray dark:bg-gray-500 dark:hover:bg-immich-dark-primary/50 hover:bg-immich-primary/10 dark:text-white"
+        >
+          <div class="flex place-content-center place-items-center text-center gap-2 px-2">
+            <Icon icon={mdiCreditCardOutline} size="18" aria-hidden />
+            Billing & Account
           </div>
         </Button>
       {/if}

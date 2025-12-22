@@ -34,6 +34,8 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+// Deployment mode: 'shared' = shared instances (no subdomain), 'siloed' = dedicated instances
+const DEPLOYMENT_MODE = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE || "shared"
 
 type Platform = "immich" | "nextcloud"
 
@@ -99,7 +101,17 @@ const features = [
   },
 ]
 
-const planDetails = [
+const planDetails = DEPLOYMENT_MODE === "shared" ? [
+  {
+    id: "free",
+    name: "Free",
+    price: "0",
+    storage: "5 GB",
+    popular: false,
+    description: "Zum Testen",
+    highlight: "~1'000 Fotos",
+    cta: "Kostenlos starten",
+  },
   {
     id: "basic",
     name: "Basic",
@@ -108,6 +120,7 @@ const planDetails = [
     popular: false,
     description: "Für Einzelpersonen",
     highlight: "~40'000 Fotos",
+    cta: "Basic starten",
   },
   {
     id: "pro",
@@ -117,6 +130,28 @@ const planDetails = [
     popular: true,
     description: "Für Familien & Teams",
     highlight: "~200'000 Fotos",
+    cta: "Pro starten",
+  },
+] : [
+  {
+    id: "basic",
+    name: "Basic",
+    price: "5",
+    storage: "200 GB",
+    popular: false,
+    description: "Für Einzelpersonen",
+    highlight: "~40'000 Fotos",
+    cta: "Basic starten",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "15",
+    storage: "1 TB",
+    popular: true,
+    description: "Für Familien & Teams",
+    highlight: "~200'000 Fotos",
+    cta: "Pro starten",
   },
 ]
 
@@ -156,8 +191,13 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState("")
   const [platform, setPlatform] = useState<Platform>("immich")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [email, setEmail] = useState("")
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle")
 
+  // Subdomain check (only for siloed mode)
   useEffect(() => {
+    if (DEPLOYMENT_MODE !== "siloed") return
+    
     if (!subdomain) {
       setSubdomainStatus("idle")
       setStatusMessage("")
@@ -196,7 +236,27 @@ export default function Home() {
     }
   }, [subdomain])
 
-  const checkoutDisabled = subdomainStatus !== "available"
+  // Email validation (for shared mode)
+  useEffect(() => {
+    if (DEPLOYMENT_MODE !== "shared") return
+    
+    if (!email) {
+      setEmailStatus("idle")
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (emailRegex.test(email)) {
+      setEmailStatus("valid")
+    } else {
+      setEmailStatus("invalid")
+    }
+  }, [email])
+
+  // Checkout disabled logic
+  const checkoutDisabled = DEPLOYMENT_MODE === "siloed" 
+    ? subdomainStatus !== "available"
+    : emailStatus !== "valid"
 
   const renderStatusIcon = () => {
     if (subdomainStatus === "checking") return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -205,9 +265,20 @@ export default function Home() {
     return null
   }
 
-  const handleCheckout = (plan: "basic" | "pro") => {
+  const handleCheckout = (planId: string) => {
     if (checkoutDisabled) return
-    window.location.href = `${API_URL}/checkout/${plan}?subdomain=${subdomain}&platform=${platform}`
+    
+    if (DEPLOYMENT_MODE === "shared") {
+      // Shared mode: redirect to signup/checkout with email
+      if (planId === "free") {
+        window.location.href = `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
+      } else {
+        window.location.href = `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}`
+      }
+    } else {
+      // Siloed mode: redirect to checkout with subdomain and platform
+      window.location.href = `${API_URL}/checkout/${planId}?subdomain=${subdomain}&platform=${platform}`
+    }
   }
 
   const currentPlatform = platformInfo[platform]
@@ -313,7 +384,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Platform Comparison */}
+        {/* Platform Comparison - only show in siloed mode */}
+        {DEPLOYMENT_MODE === "siloed" && (
         <section className="border-y bg-muted/30 py-24 md:py-32">
           <div className="container mx-auto px-4">
             <div className="mx-auto max-w-2xl text-center mb-16">
@@ -394,6 +466,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Pricing Section */}
         <section id="pricing" className="py-24 md:py-32">
@@ -406,7 +479,8 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Platform Selection */}
+            {/* Platform Selection - only for siloed mode */}
+            {DEPLOYMENT_MODE === "siloed" && (
             <div className="mx-auto max-w-lg mb-8">
               <div className="grid grid-cols-2 gap-3 p-1 rounded-xl bg-muted/50">
                 {(["immich", "nextcloud"] as Platform[]).map((p) => {
@@ -430,8 +504,37 @@ export default function Home() {
                 })}
               </div>
             </div>
+            )}
 
-            {/* Subdomain Picker */}
+            {/* Email Input - for shared mode */}
+            {DEPLOYMENT_MODE === "shared" && (
+            <div className="mx-auto max-w-md mb-10">
+              <div className="relative">
+                <Input
+                  type="email"
+                  value={email}
+                  placeholder="deine@email.ch"
+                  onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                  className="h-14 text-lg bg-muted/30 border-border/50 focus-ring"
+                />
+              </div>
+              {email && emailStatus === "invalid" && (
+                <div className="flex items-center gap-2 mt-3 text-sm">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  <span className="text-red-500">Ungültige E-Mail-Adresse</span>
+                </div>
+              )}
+              {email && emailStatus === "valid" && (
+                <div className="flex items-center gap-2 mt-3 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-green-500">E-Mail gültig</span>
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Subdomain Picker - only for siloed mode */}
+            {DEPLOYMENT_MODE === "siloed" && (
             <div className="mx-auto max-w-md mb-10">
               <div className="relative">
                 <Input
@@ -457,9 +560,10 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Pricing Cards */}
-            <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+            <div className={`mx-auto grid max-w-5xl gap-6 ${planDetails.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
               {planDetails.map((plan) => (
                 <Card 
                   key={plan.id} 
@@ -475,10 +579,12 @@ export default function Home() {
                     </div>
                   )}
                   <CardHeader className="text-center pb-2">
+                    {DEPLOYMENT_MODE === "siloed" && (
                     <div className="flex items-center justify-center gap-2 mb-3">
                       <PlatformIcon className={`h-5 w-5 ${currentPlatform.color}`} />
                       <span className="text-sm text-muted-foreground">{currentPlatform.name}</span>
                     </div>
+                    )}
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <CardDescription>{plan.description}</CardDescription>
                   </CardHeader>
@@ -497,11 +603,14 @@ export default function Home() {
                     <Button
                       className={`w-full h-12 text-base ${plan.popular ? "glow" : ""}`}
                       size="lg"
-                      variant={plan.popular ? "default" : "outline"}
+                      variant={plan.popular ? "default" : plan.id === "free" ? "secondary" : "outline"}
                       disabled={checkoutDisabled}
-                      onClick={() => handleCheckout(plan.id as "basic" | "pro")}
+                      onClick={() => handleCheckout(plan.id)}
                     >
-                      {checkoutDisabled ? "Subdomain wählen" : `${plan.name} starten`}
+                      {checkoutDisabled 
+                        ? (DEPLOYMENT_MODE === "shared" ? "E-Mail eingeben" : "Subdomain wählen")
+                        : (plan.cta || `${plan.name} starten`)
+                      }
                     </Button>
                   </CardFooter>
                 </Card>
