@@ -81,9 +81,48 @@ interface SessionStatus {
 const POLL_INTERVAL_MS = 3000
 const MAX_POLLS = 60 // max ~3 minutes
 
+// Translate common error messages to German
+function translateError(error: string): string {
+  const translations: Record<string, string> = {
+    'Email already registered': 'Diese E-Mail-Adresse ist bereits registriert.',
+    'Email+already+registered': 'Diese E-Mail-Adresse ist bereits registriert.',
+    'Email is required': 'E-Mail-Adresse ist erforderlich.',
+    'Email+is+required': 'E-Mail-Adresse ist erforderlich.',
+    'Invalid email format': 'Ungültiges E-Mail-Format.',
+    'Invalid+email+format': 'Ungültiges E-Mail-Format.',
+    'Failed to create account': 'Kontoeröffnung fehlgeschlagen. Bitte versuche es erneut.',
+    'Failed+to+create+account': 'Kontoeröffnung fehlgeschlagen. Bitte versuche es erneut.',
+  }
+  
+  // Check for exact match first
+  if (translations[error]) return translations[error]
+  
+  // Check if error contains known patterns
+  const decoded = decodeURIComponent(error.replace(/\+/g, ' '))
+  if (decoded.includes('User exists') || decoded.includes('already exists') || decoded.includes('already registered')) {
+    return 'Diese E-Mail-Adresse ist bereits registriert.'
+  }
+  if (decoded.includes('Invalid email')) {
+    return 'Ungültiges E-Mail-Format.'
+  }
+  
+  // Return decoded error as fallback
+  return decoded
+}
+
 function SuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
+  
+  // Free signup flow params
+  const freePlan = searchParams.get("plan")
+  const freeEmail = searchParams.get("email")
+  const freeInstance = searchParams.get("instance")
+  const errorParam = searchParams.get("error")
+  
+  // Check if this is a free signup redirect
+  const isFreeSignup = freePlan === "free" && freeEmail && freeInstance
+  
   const [status, setStatus] = useState<SessionStatus>({ status: "processing", message: "Laden..." })
   const [progress, setProgress] = useState(0)
   const pollCount = useRef(0)
@@ -134,6 +173,121 @@ function SuccessContent() {
 
     return () => clearInterval(interval)
   }, [checkStatus, sessionId, status.status])
+
+  // Handle error from redirect
+  if (errorParam) {
+    const errorMessage = translateError(errorParam)
+    const isEmailExists = errorMessage.includes('bereits registriert')
+    
+    return (
+      <Card className="max-w-md border-destructive">
+        <CardHeader className="text-center">
+          <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
+          <CardTitle>Registrierung fehlgeschlagen</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">{errorMessage}</p>
+          {isEmailExists && (
+            <p className="text-sm text-muted-foreground">
+              Falls du dein Passwort vergessen hast, melde dich bei deiner Immich-Instanz an und nutze die &quot;Passwort vergessen&quot; Funktion.
+            </p>
+          )}
+          <Button className="mt-2" asChild>
+            <Link href="/">Zur Startseite</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Handle free signup success
+  if (isFreeSignup) {
+    return (
+      <Card className="max-w-lg w-full">
+        <CardHeader className="text-center">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <CardTitle className="text-2xl flex items-center justify-center gap-2">
+            Dein Konto ist bereit!
+            <Sparkles className="h-5 w-5 text-primary" />
+          </CardTitle>
+          <CardDescription>Du kannst dich jetzt anmelden und loslegen.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-muted rounded-lg p-4 text-center">
+            <p className="text-sm text-muted-foreground mb-1">Deine URL:</p>
+            <a
+              href={freeInstance}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xl font-semibold text-primary hover:underline inline-flex items-center gap-2"
+            >
+              {freeInstance.replace("https://", "").replace("http://", "")}
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Badge variant="secondary">Free</Badge>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Camera className="h-3 w-3" /> Immich
+            </Badge>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">E-Mail gesendet</p>
+                <p className="text-sm text-muted-foreground">
+                  Deine Login-Daten wurden an <span className="font-mono">{freeEmail}</span> gesendet.
+                </p>
+                <div className="mt-2">
+                  <EmailLink email={freeEmail} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Mobile App</p>
+                <p className="text-sm text-muted-foreground">
+                  Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
+                </p>
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href="https://apps.apple.com/app/immich/id1613945652"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Download className="mr-1 h-3 w-3" /> iOS
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href="https://play.google.com/store/apps/details?id=app.alextran.immich"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Download className="mr-1 h-3 w-3" /> Android
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Button className="w-full" size="lg" asChild>
+            <a href={freeInstance} target="_blank" rel="noreferrer">
+              Zur Cloud öffnen
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (!sessionId) {
     return (

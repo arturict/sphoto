@@ -4,14 +4,11 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import Stripe from 'stripe';
 import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH, PLANS } from './config';
 import { getInstance, getDirectorySize } from './instances';
-import { Resend } from 'resend';
+import { getStripe, isStripeConfigured } from './lib/stripe';
+import { getResend, isResendConfigured } from './lib/resend';
 import type { InstanceMetadata } from './types';
-
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-const resend = new Resend(env.RESEND_API_KEY);
 
 // =============================================================================
 // Types
@@ -144,6 +141,12 @@ async function sendUpgradeConfirmationEmail(
   newPlan: string,
   newStorageGb: number
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send upgrade email to ${email}: ${oldPlan} -> ${newPlan}`);
+    return;
+  }
+  
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
@@ -186,6 +189,12 @@ async function sendDowngradeConfirmationEmail(
   newStorageGb: number,
   effectiveDate: string
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send downgrade email to ${email}: ${oldPlan} -> ${newPlan}, effective ${effectiveDate}`);
+    return;
+  }
+  
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
@@ -289,6 +298,11 @@ export async function upgradePlan(
   
   // Update Stripe subscription if provided
   if (stripeSubscriptionId) {
+    const stripe = getStripe();
+    if (!stripe) {
+      return { success: false, message: 'Stripe not configured' };
+    }
+    
     try {
       const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       const subscriptionItemId = subscription.items.data[0]?.id;
@@ -353,6 +367,11 @@ export async function downgradePlan(
   
   // Update Stripe subscription if provided (downgrade at end of period)
   if (stripeSubscriptionId) {
+    const stripe = getStripe();
+    if (!stripe) {
+      return { success: false, message: 'Stripe not configured' };
+    }
+    
     try {
       const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       const subscriptionItemId = subscription.items.data[0]?.id;

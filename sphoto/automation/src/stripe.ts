@@ -5,7 +5,7 @@
 import Stripe from 'stripe';
 import type { Request, Response } from 'express';
 import type { SessionStatus, Platform, UserTier } from './types';
-import { env, PLANS, DEPLOYMENT_MODE, SHARED_INSTANCES, FREE_TIER } from './config';
+import { env, PLANS, DEPLOYMENT_MODE, SHARED_INSTANCES, FREE_TIER, IS_LOCAL_DEV } from './config';
 import { generateId, createInstance, stopInstance } from './instances';
 import { 
   createSharedUser, 
@@ -17,8 +17,7 @@ import {
 } from './shared-users';
 import { sendWelcomeEmail, sendWelcomeEmailShared, sendPaymentFailedEmail, sendPlanChangeEmail } from './email';
 import { handlePlanChange } from './plan-migration';
-
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+import { getStripe, isStripeConfigured } from './lib/stripe';
 
 // Session status store (in-memory)
 export const sessionStatus = new Map<string, SessionStatus>();
@@ -28,6 +27,13 @@ export const sessionStatus = new Map<string, SessionStatus>();
 // =============================================================================
 
 export async function handleWebhook(req: Request, res: Response): Promise<void> {
+  const stripe = getStripe();
+  if (!stripe) {
+    console.error('Webhook received but Stripe is not configured');
+    res.status(501).json({ error: 'Stripe not configured' });
+    return;
+  }
+
   const sig = req.headers['stripe-signature'] as string;
   let event: Stripe.Event;
 
@@ -43,9 +49,9 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 
   try {
     if (DEPLOYMENT_MODE === 'shared') {
-      await handleWebhookShared(event, res);
+      await handleWebhookShared(stripe, event, res);
     } else {
-      await handleWebhookSiloed(event, res);
+      await handleWebhookSiloed(stripe, event, res);
     }
   } catch (err) {
     console.error('Webhook handler error:', err);
@@ -57,7 +63,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
 // Shared Mode Webhook Handler
 // =============================================================================
 
-async function handleWebhookShared(event: Stripe.Event, res: Response): Promise<void> {
+async function handleWebhookShared(stripe: Stripe, event: Stripe.Event, res: Response): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -209,7 +215,7 @@ async function handleWebhookShared(event: Stripe.Event, res: Response): Promise<
 // Siloed Mode Webhook Handler (Original Logic)
 // =============================================================================
 
-async function handleWebhookSiloed(event: Stripe.Event, res: Response): Promise<void> {
+async function handleWebhookSiloed(stripe: Stripe, event: Stripe.Event, res: Response): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -320,6 +326,11 @@ export async function getSessionStatus(sessionId: string): Promise<SessionStatus
     return status;
   }
   
+  const stripe = getStripe();
+  if (!stripe) {
+    return { status: 'unknown', message: 'Stripe not configured' };
+  }
+  
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status === 'paid') {
@@ -340,7 +351,16 @@ export async function createCheckoutSession(
   subdomain?: string,
   platform: Platform = 'immich'
 ): Promise<string> {
+  const stripe = getStripe();
+  if (!stripe) {
+    throw new Error('Stripe not configured. Set STRIPE_SECRET_KEY environment variable.');
+  }
+  
   const priceId = plan === 'pro' ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_BASIC;
+  
+  if (!priceId) {
+    throw new Error(`No price ID configured for ${plan} plan. Set STRIPE_PRICE_${plan.toUpperCase()} environment variable.`);
+  }
   
   const metadata: Record<string, string> = { 
     platform,
@@ -352,12 +372,17 @@ export async function createCheckoutSession(
     metadata.subdomain = subdomain;
   }
   
+  // Use appropriate URL scheme for local dev vs production
+  const baseUrl = IS_LOCAL_DEV 
+    ? 'http://localhost:3000' 
+    : `https://${env.DOMAIN}`;
+  
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `https://${env.DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `https://${env.DOMAIN}`,
+    success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: baseUrl,
     metadata,
   });
   

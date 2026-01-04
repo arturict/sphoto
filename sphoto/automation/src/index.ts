@@ -3,8 +3,8 @@
 // =============================================================================
 
 import express, { type Request, type Response, type NextFunction } from 'express';
-import Stripe from 'stripe';
-import { env, DEPLOYMENT_MODE, SHARED_INSTANCES, FREE_TIER } from './config';
+import { join } from 'path';
+import { env, DEPLOYMENT_MODE, SHARED_INSTANCES, FREE_TIER, INSTANCES_DIR, IS_LOCAL_DEV } from './config';
 import { handleWebhook, getSessionStatus, createCheckoutSession } from './stripe';
 import { checkSubdomain } from './subdomain';
 import { listInstances, getInstance, startInstance, stopInstance, deleteInstance, migrateInstanceStorage, getInstanceStoragePath } from './instances';
@@ -20,6 +20,7 @@ import {
   updateSharedUserQuota,
   updateSharedUserTier,
   deleteSharedUser,
+  purgeSharedUser,
   migrateUserBetweenInstances,
   getSharedUserStats,
   checkSharedInstanceHealth,
@@ -65,10 +66,11 @@ import {
   getHealthSummary,
   getInstanceHealth,
 } from './health';
+import { getStripe, isStripeConfigured } from './lib/stripe';
+import { isResendConfigured } from './lib/resend';
 import type { BrandingSettings, UserTier } from './types';
 
 const app = express();
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 // =============================================================================
 // CORS Middleware
@@ -99,7 +101,61 @@ app.get('/health', (_req: Request, res: Response) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     deploymentMode: DEPLOYMENT_MODE,
+    services: {
+      stripeConfigured: isStripeConfigured(),
+      resendConfigured: isResendConfigured(),
+    },
   });
+});
+
+// =============================================================================
+// Dev-only Nuke Endpoint (delete all test users)
+// =============================================================================
+app.post('/api/dev/nuke', async (req: Request, res: Response) => {
+  // Only allow in local development
+  if (!IS_LOCAL_DEV) {
+    return res.status(403).json({ error: 'This endpoint is only available in local development' });
+  }
+
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Nuke only available in shared deployment mode' });
+  }
+
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const users = listSharedUsers();
+    const purged: string[] = [];
+    const errors: string[] = [];
+
+    for (const user of users) {
+      try {
+        // Use purgeSharedUser to completely remove the user (including local JSON file)
+        const result = await purgeSharedUser(user.visibleId);
+        if (result.success) {
+          purged.push(user.email);
+        } else {
+          errors.push(`${user.email}: ${result.error}`);
+        }
+      } catch (err) {
+        errors.push(`${user.email}: ${(err as Error).message}`);
+      }
+    }
+
+    console.log(`[DEV NUKE] Purged ${purged.length} users, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      message: `Purged ${purged.length} users`,
+      purged,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 // =============================================================================
@@ -147,6 +203,55 @@ app.post('/signup/free', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Free signup error:', err);
     res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+// GET handler for free signup (redirect-based flow from web)
+app.get('/signup/free', async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.redirect(`https://${env.DOMAIN}/success?error=Free+tier+only+available+in+shared+mode`);
+  }
+
+  const email = req.query.email as string;
+  // For local dev (localhost), use http and port 3000; for production use https
+  const isLocalDev = env.DOMAIN === 'localhost' || env.DOMAIN.startsWith('localhost:');
+  const successUrl = process.env.SUCCESS_URL || (isLocalDev 
+    ? 'http://localhost:3000/success' 
+    : `https://${env.DOMAIN}/success`);
+  
+  if (!email || typeof email !== 'string') {
+    return res.redirect(`${successUrl}?error=Email+is+required`);
+  }
+
+  // Basic email validation
+  if (!email.includes('@') || !email.includes('.')) {
+    return res.redirect(`${successUrl}?error=Invalid+email+format`);
+  }
+
+  // Check if user already exists
+  const existing = getSharedUserByEmail(email);
+  if (existing) {
+    return res.redirect(`${successUrl}?error=Email+already+registered`);
+  }
+
+  try {
+    const result = await createSharedUser(email, 'free', FREE_TIER.quotaGB);
+    
+    if (!result.success || !result.user) {
+      return res.redirect(`${successUrl}?error=${encodeURIComponent(result.error || 'Failed to create account')}`);
+    }
+
+    // Log password for local dev (since email might not work)
+    if (result.password) {
+      console.log(`[DEV] Created user ${email} with password: ${result.password}`);
+      await sendFreeWelcomeEmail(email, result.password);
+    }
+
+    // Redirect to success page
+    return res.redirect(`${successUrl}?plan=free&email=${encodeURIComponent(email)}&instance=${encodeURIComponent(SHARED_INSTANCES.free.url)}`);
+  } catch (err) {
+    console.error('Free signup error:', err);
+    return res.redirect(`${successUrl}?error=Failed+to+create+account`);
   }
 });
 
@@ -244,6 +349,11 @@ app.get('/portal/dashboard', portalAuth, async (req: Request, res: Response) => 
 
 // Get Stripe Customer Portal URL
 app.get('/portal/billing', portalAuth, async (req: Request, res: Response) => {
+  const stripe = getStripe();
+  if (!stripe) {
+    return res.status(501).json({ error: 'Stripe not configured' });
+  }
+
   const user = (req as any).portalUser;
 
   if (!user.stripeCustomerId) {
@@ -411,7 +521,7 @@ app.post('/api/instances/:id/generate-api-key', adminAuth, async (req: Request, 
     const { existsSync, readFileSync, writeFileSync } = await import('fs');
     const { join } = await import('path');
     
-    const metaPath = join('/data/instances', instanceId, 'metadata.json');
+    const metaPath = join(INSTANCES_DIR, instanceId, 'metadata.json');
     if (!existsSync(metaPath)) {
       return res.status(404).json({ error: 'Instance not found' });
     }
@@ -807,7 +917,7 @@ app.post('/api/shared/instances/:instance/upgrade', adminAuth, async (req: Reque
     return res.status(400).json({ error: 'Invalid instance. Use "free" or "paid"' });
   }
 
-  const instanceDir = `/data/instances/${instance}`;
+  const instanceDir = join(INSTANCES_DIR, instance);
   
   try {
     console.log(`Starting upgrade for ${instance} instance...`);
@@ -841,7 +951,7 @@ app.post('/api/shared/instances/upgrade-all', adminAuth, async (_req: Request, r
     const results: Record<string, { success: boolean; message?: string; error?: string }> = {};
     
     for (const instance of ['free', 'paid'] as const) {
-      const instanceDir = `/data/instances/${instance}`;
+  const instanceDir = join(INSTANCES_DIR, instance);
       
       try {
         console.log(`Upgrading ${instance} instance...`);

@@ -2,14 +2,12 @@
 // Health Monitoring Service
 // =============================================================================
 
-import { Resend } from 'resend';
 import { env, INSTANCES_DIR } from './config';
+import { getResend } from './lib/resend';
 import { listInstances, getInstance } from './instances';
 import type { InstanceMetadata } from './types';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-
-const resend = new Resend(env.RESEND_API_KEY);
 
 // =============================================================================
 // Types
@@ -174,6 +172,12 @@ async function sendHealthAlertEmail(
   status: HealthStatus,
   instance: InstanceMetadata
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send health alert email for ${status.instanceId} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: env.ADMIN_EMAIL,
@@ -196,7 +200,7 @@ async function sendHealthAlertEmail(
           <ul>
             <li>Check Docker containers: <code>docker ps | grep ${status.instanceId}</code></li>
             <li>Check logs: <code>docker logs sphoto-${status.instanceId}-server</code></li>
-            <li>Restart: <code>cd /data/instances/${status.instanceId} && docker compose restart</code></li>
+            <li>Restart: <code>cd ${INSTANCES_DIR}/${status.instanceId} && docker compose restart</code></li>
           </ul>
         ` : `
           <p style="color: #22c55e;">Instance has recovered and is now healthy.</p>
@@ -212,6 +216,12 @@ async function sendSSLExpiryAlertEmail(
   status: HealthStatus,
   instance: InstanceMetadata
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send SSL expiry alert email for ${status.instanceId} (Resend not configured)`);
+    return;
+  }
+
   // Only send for critical cases (≤7 days) - SSL should auto-renew via Traefik
   await resend.emails.send({
     from: env.EMAIL_FROM,

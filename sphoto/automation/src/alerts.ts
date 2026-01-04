@@ -4,12 +4,10 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { Resend } from 'resend';
 import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
+import { getResend } from './lib/resend';
 import { listInstances, getInstance, getDirectorySize } from './instances';
 import type { InstanceMetadata } from './types';
-
-const resend = new Resend(env.RESEND_API_KEY);
 
 // =============================================================================
 // Types
@@ -203,6 +201,12 @@ async function sendStorageWarningEmail(
   usedGb: number,
   limitGb: number
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send storage warning email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const isWarning = percentage < 100;
   const color = percentage >= 100 ? '#dc2626' : percentage >= 90 ? '#ea580c' : '#ca8a04';
   const icon = percentage >= 100 ? '🔴' : percentage >= 90 ? '🟠' : '🟡';
@@ -261,6 +265,12 @@ async function sendInactiveReminderEmail(
   instanceId: string,
   daysSinceActivity: number
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send inactive reminder email to ${email} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
@@ -308,6 +318,12 @@ async function sendInstanceDownEmail(
   instanceId: string,
   platform: string
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send instance down email for ${instanceId} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: adminEmail,
@@ -329,7 +345,7 @@ async function sendInstanceDownEmail(
         <ul>
           <li>Check Docker containers: <code>docker ps | grep ${instanceId}</code></li>
           <li>Check logs: <code>docker logs sphoto-${instanceId}-server</code></li>
-          <li>Restart: <code>cd /data/instances/${instanceId} && docker compose restart</code></li>
+          <li>Restart: <code>cd ${INSTANCES_DIR}/${instanceId} && docker compose restart</code></li>
         </ul>
       </div>
     `,
@@ -344,6 +360,12 @@ async function sendChurnRiskEmail(
   email: string,
   daysSinceUpload: number
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send churn risk email for ${instanceId} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: adminEmail,

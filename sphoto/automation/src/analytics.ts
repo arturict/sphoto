@@ -8,7 +8,8 @@ import { join } from 'path';
 import type { DailyStats, AnalyticsData, InstanceMetadata } from './types';
 import { INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
 
-const STATS_DIR = '/data/stats';
+// Stats directory - use INSTANCES_DIR parent or fallback
+const STATS_DIR = process.env.STATS_DIR || join(INSTANCES_DIR, '_stats');
 const STATS_RETENTION_DAYS = 90;
 
 export function getStatsFilePath(date: string): string {

@@ -1,0 +1,125 @@
+# =============================================================================
+# SPhoto Local Development Stack
+# =============================================================================
+# Runs only Immich instances + ML in Docker.
+# Web + Automation run locally for hot reload.
+#
+# Usage:
+#   make dev          # Start everything
+#   make dev-down     # Stop everything
+#
+# Ports:
+#   - Free Immich:  http://localhost:2283
+#   - Paid Immich:  http://localhost:2284
+#   - Web:          http://localhost:3000  (run locally)
+#   - Automation:   http://localhost:3001  (run locally)
+# =============================================================================
+
+name: sphoto-local
+
+services:
+  # ===========================================================================
+  # Machine Learning (Shared)
+  # ===========================================================================
+  ml:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: sphoto-ml
+    volumes:
+      - ml-cache:/cache
+    environment:
+      - MACHINE_LEARNING_WORKERS=1
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Free Tier Instance (No ML)
+  # ===========================================================================
+  free-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: sphoto-free-server
+    environment:
+      - DB_URL=postgresql://sphoto:${DB_PASSWORD_FREE:-localdev}@free-db:5432/sphoto
+      - REDIS_HOSTNAME=free-redis
+      # No ML for free tier
+      - MACHINE_LEARNING_URL=
+    volumes:
+      - ./.local/free/uploads:/usr/src/app/upload
+    depends_on:
+      - free-db
+      - free-redis
+    ports:
+      - "2283:2283"
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  free-db:
+    image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0
+    container_name: sphoto-free-db
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD_FREE:-localdev}
+      - POSTGRES_USER=sphoto
+      - POSTGRES_DB=sphoto
+    volumes:
+      - ./.local/free/db:/var/lib/postgresql/data
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  free-redis:
+    image: valkey/valkey:9
+    container_name: sphoto-free-redis
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Paid Tier Instance (With ML)
+  # ===========================================================================
+  paid-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: sphoto-paid-server
+    environment:
+      - DB_URL=postgresql://sphoto:${DB_PASSWORD_PAID:-localdev}@paid-db:5432/sphoto
+      - REDIS_HOSTNAME=paid-redis
+      # Use shared ML service
+      - MACHINE_LEARNING_URL=http://sphoto-ml:3003
+    volumes:
+      - ./.local/paid/uploads:/usr/src/app/upload
+    depends_on:
+      - paid-db
+      - paid-redis
+      - ml
+    ports:
+      - "2284:2283"
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  paid-db:
+    image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0
+    container_name: sphoto-paid-db
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD_PAID:-localdev}
+      - POSTGRES_USER=sphoto
+      - POSTGRES_DB=sphoto
+    volumes:
+      - ./.local/paid/db:/var/lib/postgresql/data
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+  paid-redis:
+    image: valkey/valkey:9
+    container_name: sphoto-paid-redis
+    networks:
+      - sphoto-local
+    restart: unless-stopped
+
+networks:
+  sphoto-local:
+    name: sphoto-local
+
+volumes:
+  ml-cache:

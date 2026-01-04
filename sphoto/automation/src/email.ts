@@ -2,11 +2,9 @@
 // Email Service
 // =============================================================================
 
-import { Resend } from 'resend';
 import { env, SHARED_INSTANCES } from './config';
+import { getResend, isResendConfigured } from './lib/resend';
 import type { Platform } from './types';
-
-const resend = new Resend(env.RESEND_API_KEY);
 
 export async function sendWelcomeEmail(
   email: string, 
@@ -16,6 +14,12 @@ export async function sendWelcomeEmail(
   password: string | null,
   platform: Platform = 'immich'
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send welcome email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const url = `https://${id}.${env.DOMAIN}`;
   
   const isNextcloud = platform === 'nextcloud';
@@ -123,6 +127,12 @@ export async function sendWelcomeEmailShared(
   storageGb: number,
   password: string | null
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send shared welcome email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const config = instance === 'free' ? SHARED_INSTANCES.free : SHARED_INSTANCES.paid;
   const url = config.url;
   const isFree = instance === 'free';
@@ -217,6 +227,12 @@ export async function sendPlanChangeEmail(
   newStorageGb: number,
   newInstance: 'free' | 'paid'
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send plan change email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const config = newInstance === 'free' ? SHARED_INSTANCES.free : SHARED_INSTANCES.paid;
   const url = config.url;
   const isFree = newInstance === 'free';
@@ -282,6 +298,12 @@ export async function sendFreeWelcomeEmail(
 }
 
 export async function sendPaymentFailedEmail(email: string, id: string): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send payment failed email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
@@ -307,6 +329,12 @@ export async function sendExportReadyEmail(
   downloadUrl: string,
   fileSizeBytes: number
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send export ready email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -369,6 +397,12 @@ export async function sendPortalLoginEmail(
   email: string,
   token: string
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send portal login email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const loginUrl = `https://portal.${env.DOMAIN}/auth?token=${token}`;
 
   const { error } = await resend.emails.send({
@@ -413,6 +447,12 @@ export async function sendAccountDeletionEmail(
   email: string,
   scheduledFor: string
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send account deletion email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const formattedDate = new Date(scheduledFor).toLocaleDateString('de-CH', {
     weekday: 'long',
     year: 'numeric',
@@ -467,6 +507,12 @@ export async function sendAccountDeletionEmail(
 export async function sendAccountDeletionCancelledEmail(
   email: string
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send account deletion cancelled email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,

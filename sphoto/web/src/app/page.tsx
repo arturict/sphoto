@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,361 +17,228 @@ import {
   ArrowRight,
   Check,
   CheckCircle,
+  ChevronDown,
   Cloud,
-  Loader2,
+  HardDrive,
   Lock,
-  Search,
-  ShieldCheck,
+  Mail,
+  Shield,
   Smartphone,
   Sparkles,
-  Users,
+  Upload,
   XCircle,
-  Camera,
-  ChevronDown,
   Zap,
-  Globe,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
-// Deployment mode: 'shared' = shared instances (no subdomain), 'siloed' = dedicated instances
-const DEPLOYMENT_MODE = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE || "shared"
 
-type Platform = "immich" | "nextcloud"
-
-const platformInfo = {
-  immich: {
-    name: "Immich",
-    icon: Camera,
-    description: "KI-gestützte Foto-Cloud mit Gesichtserkennung",
-    color: "text-primary",
-    features: [
-      "KI-Gesichtserkennung",
-      "Automatische Backups",
-      "iOS & Android Apps",
-      "Objekterkennung",
-      "Fotos auf Weltkarte",
-    ],
-  },
-  nextcloud: {
-    name: "Nextcloud",
-    icon: Cloud,
-    description: "Komplette Cloud-Lösung für Dateien, Kalender & mehr",
-    color: "text-blue-500",
-    features: [
-      "Datei-Synchronisation",
-      "Kalender & Kontakte",
-      "Office-Integration",
-      "Desktop & Mobile Apps",
-      "Collaboration Tools",
-    ],
-  },
-}
-
-const features = [
-  {
-    icon: ShieldCheck,
-    title: "Deine Daten gehören dir",
-    description: "Verschlüsselt gespeichert in der Schweiz. Kein Tracking, keine Werbung.",
-  },
-  {
-    icon: Smartphone,
-    title: "Native Mobile Apps",
-    description: "Sofortige Backups und Sync vom Handy für iOS & Android.",
-  },
-  {
-    icon: Lock,
-    title: "Isolierte Instanzen",
-    description: "Jede Cloud läuft in eigenen Containern mit separater DB.",
-  },
-  {
-    icon: Zap,
-    title: "Schnelle Einrichtung",
-    description: "In unter 3 Minuten ist deine Cloud bereit zur Nutzung.",
-  },
-  {
-    icon: Search,
-    title: "Intelligente Suche",
-    description: "Finde Fotos nach Personen, Objekten oder Orten.",
-  },
-  {
-    icon: Users,
-    title: "Teilen leicht gemacht",
-    description: "Lade weitere Nutzer ein und verwalte Zugriffsrechte.",
-  },
-]
-
-const planDetails = DEPLOYMENT_MODE === "shared" ? [
+const plans = [
   {
     id: "free",
     name: "Free",
     price: "0",
     storage: "5 GB",
-    popular: false,
-    description: "Zum Testen",
-    highlight: "~1'000 Fotos",
+    photos: "~1'000",
+    description: "Zum Ausprobieren",
+    features: ["5 GB Speicher", "Mobile Apps", "Automatische Backups"],
     cta: "Kostenlos starten",
+    popular: false,
+    variant: "secondary" as const,
   },
   {
     id: "basic",
     name: "Basic",
     price: "5",
     storage: "200 GB",
-    popular: false,
+    photos: "~40'000",
     description: "Für Einzelpersonen",
-    highlight: "~40'000 Fotos",
-    cta: "Basic starten",
+    features: ["200 GB Speicher", "KI-Gesichtserkennung", "Objekterkennung", "Prioritäts-Support"],
+    cta: "Basic wählen",
+    popular: false,
+    variant: "outline" as const,
   },
   {
     id: "pro",
     name: "Pro",
     price: "15",
     storage: "1 TB",
+    photos: "~200'000",
+    description: "Für Familien",
+    features: ["1 TB Speicher", "Alles aus Basic", "Mehrere Nutzer", "Geteilte Alben"],
+    cta: "Pro wählen",
     popular: true,
-    description: "Für Familien & Teams",
-    highlight: "~200'000 Fotos",
-    cta: "Pro starten",
-  },
-] : [
-  {
-    id: "basic",
-    name: "Basic",
-    price: "5",
-    storage: "200 GB",
-    popular: false,
-    description: "Für Einzelpersonen",
-    highlight: "~40'000 Fotos",
-    cta: "Basic starten",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "15",
-    storage: "1 TB",
-    popular: true,
-    description: "Für Familien & Teams",
-    highlight: "~200'000 Fotos",
-    cta: "Pro starten",
+    variant: "default" as const,
   },
 ]
 
-const allFeatures = [
-  "Keine Werbung",
-  "Automatische Backups",
-  "Eigene Subdomain",
-  "Schweizer Server 🇨🇭",
-  "Voller API-Zugang",
-  "DSGVO-Export",
-  "Mobile & Desktop Apps",
-  "Monatlich kündbar",
+const features = [
+  {
+    icon: Shield,
+    title: "Deine Daten, deine Kontrolle",
+    description: "Gehostet in der Schweiz. Keine Analyse, kein Tracking, keine Werbung.",
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile Apps",
+    description: "Native iOS & Android Apps mit automatischem Foto-Backup.",
+  },
+  {
+    icon: Zap,
+    title: "KI-Suche",
+    description: "Finde Fotos nach Gesichtern, Objekten oder Orten.",
+  },
+  {
+    icon: Lock,
+    title: "Verschlüsselt",
+    description: "SSL/TLS verschlüsselt. Deine Fotos sind sicher.",
+  },
+  {
+    icon: Upload,
+    title: "Einfache Migration",
+    description: "Importiere deine Fotos von Google Photos oder iCloud.",
+  },
+  {
+    icon: HardDrive,
+    title: "DSGVO-Export",
+    description: "Exportiere jederzeit alle deine Daten.",
+  },
 ]
 
 const faqs = [
   {
-    q: "Was ist der Unterschied zwischen Immich und Nextcloud?",
-    a: "Immich ist spezialisiert auf Fotos & Videos mit KI-gestützter Gesichts- und Objekterkennung. Nextcloud ist eine komplette Cloud-Lösung für Dateien, Kalender, Kontakte und Office-Dokumente.",
+    q: "Was ist SPhoto?",
+    a: "SPhoto ist eine private Foto-Cloud basierend auf Immich - die beste Open-Source Alternative zu Google Photos. Deine Fotos werden sicher in der Schweiz gehostet.",
   },
   {
-    q: "Kann ich später die Plattform wechseln?",
-    a: "Ein direkter Wechsel ist nicht möglich, aber du kannst deine Daten exportieren und eine neue Instanz mit der anderen Plattform erstellen.",
+    q: "Wie funktioniert die KI-Erkennung?",
+    a: "Bei Basic und Pro Plänen analysiert unsere KI deine Fotos lokal auf unseren Servern. So kannst du nach Gesichtern, Objekten oder Szenen suchen - ohne dass deine Daten die Schweiz verlassen.",
   },
   {
-    q: "Wie sicher sind meine Daten?",
-    a: "Jede Instanz läuft isoliert mit eigenen Containern und Datenbanken. Deine Daten werden ausschliesslich in der Schweiz gespeichert.",
+    q: "Kann ich meine Google Photos importieren?",
+    a: "Ja! Exportiere deine Fotos über Google Takeout und lade sie dann über die Immich App oder Web-Oberfläche hoch.",
   },
   {
-    q: "Kann ich meine Daten exportieren?",
-    a: "Ja, jederzeit. DSGVO-konforme Exporte sind kostenlos möglich. Deine Daten gehören dir.",
+    q: "Was passiert wenn ich kündige?",
+    a: "Du kannst jederzeit monatlich kündigen. Deine Daten bleiben 30 Tage verfügbar zum Export. Danach werden sie gelöscht.",
+  },
+  {
+    q: "Gibt es eine Familienoption?",
+    a: "Ja, mit dem Pro Plan kannst du weitere Nutzer einladen und Alben teilen. Jeder Nutzer hat sein eigenes Konto.",
   },
 ]
 
 export default function Home() {
-  const [subdomain, setSubdomain] = useState("")
-  const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle")
-  const [statusMessage, setStatusMessage] = useState("")
-  const [platform, setPlatform] = useState<Platform>("immich")
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [email, setEmail] = useState("")
-  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle")
+  const [isValidEmail, setIsValidEmail] = useState(false)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
 
-  // Subdomain check (only for siloed mode)
-  useEffect(() => {
-    if (DEPLOYMENT_MODE !== "siloed") return
-    
-    if (!subdomain) {
-      setSubdomainStatus("idle")
-      setStatusMessage("")
-      return
-    }
-
-    if (subdomain.length < 3) {
-      setSubdomainStatus("invalid")
-      setStatusMessage("Mindestens 3 Zeichen")
-      return
-    }
-
-    const controller = new AbortController()
-    const timer = setTimeout(async () => {
-      setSubdomainStatus("checking")
-      try {
-        const res = await fetch(`${API_URL}/subdomain/check/${subdomain}`, { signal: controller.signal })
-        const data = await res.json()
-        if (data?.available) {
-          setSubdomainStatus("available")
-          setStatusMessage(`${subdomain}.${DOMAIN} ist verfügbar`)
-        } else {
-          setSubdomainStatus("taken")
-          setStatusMessage(data?.reason || "Bereits vergeben")
-        }
-      } catch (error) {
-        if ((error as DOMException)?.name === "AbortError") return
-        setSubdomainStatus("invalid")
-        setStatusMessage("Fehler beim Prüfen")
-      }
-    }, 400)
-
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [subdomain])
-
-  // Email validation (for shared mode)
-  useEffect(() => {
-    if (DEPLOYMENT_MODE !== "shared") return
-    
-    if (!email) {
-      setEmailStatus("idle")
-      return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (emailRegex.test(email)) {
-      setEmailStatus("valid")
-    } else {
-      setEmailStatus("invalid")
-    }
-  }, [email])
-
-  // Checkout disabled logic
-  const checkoutDisabled = DEPLOYMENT_MODE === "siloed" 
-    ? subdomainStatus !== "available"
-    : emailStatus !== "valid"
-
-  const renderStatusIcon = () => {
-    if (subdomainStatus === "checking") return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-    if (subdomainStatus === "available") return <CheckCircle className="h-4 w-4 text-green-500" />
-    if (subdomainStatus === "taken" || subdomainStatus === "invalid") return <XCircle className="h-4 w-4 text-red-500" />
-    return null
+  const validateEmail = (value: string) => {
+    setEmail(value.toLowerCase())
+    setIsValidEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
   }
 
   const handleCheckout = (planId: string) => {
-    if (checkoutDisabled) return
-    
-    if (DEPLOYMENT_MODE === "shared") {
-      // Shared mode: redirect to signup/checkout with email
-      if (planId === "free") {
-        window.location.href = `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
-      } else {
-        window.location.href = `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}`
-      }
+    if (!isValidEmail) return
+    if (planId === "free") {
+      window.location.href = `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
     } else {
-      // Siloed mode: redirect to checkout with subdomain and platform
-      window.location.href = `${API_URL}/checkout/${planId}?subdomain=${subdomain}&platform=${platform}`
+      window.location.href = `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}`
     }
   }
 
-  const currentPlatform = platformInfo[platform]
-  const PlatformIcon = currentPlatform.icon
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
-        <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 font-bold text-xl">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Cloud className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span>SPhoto</span>
+            SPhoto
           </Link>
-          <nav className="hidden items-center gap-8 text-sm md:flex">
-            <Link href="#features" className="text-muted-foreground transition-colors hover:text-foreground">Features</Link>
-            <Link href="#pricing" className="text-muted-foreground transition-colors hover:text-foreground">Preise</Link>
-            <Link href="#faq" className="text-muted-foreground transition-colors hover:text-foreground">FAQ</Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm">
+            <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
+              Features
+            </Link>
+            <Link href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+              Preise
+            </Link>
+            <Link href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">
+              FAQ
+            </Link>
           </nav>
-          <Button size="sm" className="font-medium" asChild>
-            <a href="#pricing">Jetzt starten</a>
+          <Button asChild>
+            <a href="#pricing">Loslegen</a>
           </Button>
         </div>
       </header>
 
       <main>
-        {/* Hero Section */}
-        <section className="relative overflow-hidden hero-gradient">
-          <div className="container mx-auto px-4 py-24 md:py-32 lg:py-40">
-            <div className="mx-auto max-w-4xl text-center">
-              <Badge variant="secondary" className="mb-6 animate-in">
-                <Globe className="mr-1 h-3 w-3" />
+        {/* Hero */}
+        <section className="py-20 md:py-32">
+          <div className="container">
+            <div className="mx-auto max-w-3xl text-center">
+              <Badge variant="secondary" className="mb-4">
+                <Sparkles className="mr-1 h-3 w-3" />
                 Gehostet in der Schweiz 🇨🇭
               </Badge>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl animate-in">
-                Deine private Cloud
-                <span className="block gradient-text mt-2">ohne Big-Tech</span>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+                Deine Fotos.
+                <br />
+                <span className="text-primary">Deine Cloud.</span>
               </h1>
-              <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl animate-in">
-                Google Photos Alternative mit Schweizer Hosting. 
-                Deine Fotos, deine Daten, deine Kontrolle.
+              <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
+                Die private Google Photos Alternative mit Schweizer Hosting. 
+                KI-Gesichtserkennung, automatische Backups, volle Kontrolle über deine Daten.
               </p>
-              <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center animate-in">
-                <Button size="lg" className="h-12 px-8 text-base glow" asChild>
+              <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+                <Button size="lg" asChild>
                   <a href="#pricing">
-                    Jetzt starten
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    Kostenlos starten
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" className="h-12 px-8 text-base" asChild>
-                  <Link href="#features">
-                    Mehr erfahren
-                  </Link>
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="#features">Mehr erfahren</Link>
                 </Button>
               </div>
               
-              {/* Trust badges */}
-              <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
+              {/* Trust indicators */}
+              <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-green-500" />
-                  <span>SSL verschlüsselt</span>
+                  <Check className="h-4 w-4 text-green-500" />
+                  Keine Kreditkarte nötig
                 </div>
                 <div className="flex items-center gap-2">
-                  <Lock className="h-5 w-5 text-green-500" />
-                  <span>DSGVO-konform</span>
+                  <Check className="h-4 w-4 text-green-500" />
+                  DSGVO-konform
                 </div>
                 <div className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-green-500" />
-                  <span>In 3 Min. bereit</span>
+                  <Check className="h-4 w-4 text-green-500" />
+                  Monatlich kündbar
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features Grid */}
-        <section id="features" className="py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="mx-auto max-w-2xl text-center mb-16">
-              <Badge variant="outline" className="mb-4">Features</Badge>
-              <h2 className="text-3xl font-bold md:text-4xl">Alles was du brauchst</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Modernste Technologie, maximale Privatsphäre
+        {/* Features */}
+        <section id="features" className="py-20 bg-muted/50">
+          <div className="container">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold">Warum SPhoto?</h2>
+              <p className="mt-2 text-muted-foreground">
+                Alles was du von Google Photos kennst - ohne die Nachteile.
               </p>
             </div>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {features.map((feature) => (
-                <Card key={feature.title} className="card-hover border-border/50 bg-card/50">
-                  <CardHeader>
-                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                      <feature.icon className="h-6 w-6 text-primary" />
+                <Card key={feature.title} className="border-0 shadow-none bg-background">
+                  <CardHeader className="pb-2">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                      <feature.icon className="h-5 w-5 text-primary" />
                     </div>
                     <CardTitle className="text-lg">{feature.title}</CardTitle>
                   </CardHeader>
@@ -384,249 +251,98 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Platform Comparison - only show in siloed mode */}
-        {DEPLOYMENT_MODE === "siloed" && (
-        <section className="border-y bg-muted/30 py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="mx-auto max-w-2xl text-center mb-16">
-              <Badge variant="outline" className="mb-4">Zwei Plattformen</Badge>
-              <h2 className="text-3xl font-bold md:text-4xl">Wähle was zu dir passt</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Beide Optionen mit Schweizer Hosting und nativen Apps
-              </p>
-            </div>
-            <div className="grid gap-8 lg:grid-cols-2 max-w-5xl mx-auto">
-              {/* Immich Card */}
-              <Card className="card-hover border-primary/20 overflow-hidden">
-                <div className="h-1 bg-gradient-to-r from-primary to-primary/50" />
-                <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                      <Camera className="h-7 w-7 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">Immich</CardTitle>
-                      <CardDescription>Foto-Cloud mit KI</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <p className="text-muted-foreground">
-                    Die perfekte Google Photos Alternative mit KI-gestützter Gesichtserkennung.
-                  </p>
-                  <ul className="space-y-3">
-                    {platformInfo.immich.features.map((f) => (
-                      <li key={f} className="flex items-center gap-3 text-sm">
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/10">
-                          <Check className="h-3 w-3 text-green-500" />
-                        </div>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-muted-foreground pt-2 border-t">
-                    Ideal als Google Photos oder iCloud Alternative
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Nextcloud Card */}
-              <Card className="card-hover border-blue-500/20 overflow-hidden">
-                <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-500/50" />
-                <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10">
-                      <Cloud className="h-7 w-7 text-blue-500" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">Nextcloud</CardTitle>
-                      <CardDescription>Komplette Cloud-Lösung</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <p className="text-muted-foreground">
-                    All-in-One Lösung für Dateien, Kalender, Kontakte und Office.
-                  </p>
-                  <ul className="space-y-3">
-                    {platformInfo.nextcloud.features.map((f) => (
-                      <li key={f} className="flex items-center gap-3 text-sm">
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/10">
-                          <Check className="h-3 w-3 text-green-500" />
-                        </div>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-xs text-muted-foreground pt-2 border-t">
-                    Ideal als Google Drive oder Dropbox Alternative
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-        )}
-
-        {/* Pricing Section */}
-        <section id="pricing" className="py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="mx-auto max-w-2xl text-center mb-12">
-              <Badge variant="outline" className="mb-4">Preise</Badge>
-              <h2 className="text-3xl font-bold md:text-4xl">Einfach & transparent</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Keine versteckten Gebühren. Monatlich kündbar.
+        {/* Pricing */}
+        <section id="pricing" className="py-20">
+          <div className="container">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold">Einfache Preise</h2>
+              <p className="mt-2 text-muted-foreground">
+                Starte kostenlos. Upgrade wenn du mehr brauchst.
               </p>
             </div>
 
-            {/* Platform Selection - only for siloed mode */}
-            {DEPLOYMENT_MODE === "siloed" && (
-            <div className="mx-auto max-w-lg mb-8">
-              <div className="grid grid-cols-2 gap-3 p-1 rounded-xl bg-muted/50">
-                {(["immich", "nextcloud"] as Platform[]).map((p) => {
-                  const info = platformInfo[p]
-                  const Icon = info.icon
-                  const isSelected = platform === p
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPlatform(p)}
-                      className={`flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
-                        isSelected 
-                          ? "bg-background shadow-sm text-foreground" 
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Icon className={`h-4 w-4 ${isSelected ? info.color : ""}`} />
-                      {info.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            )}
-
-            {/* Email Input - for shared mode */}
-            {DEPLOYMENT_MODE === "shared" && (
-            <div className="mx-auto max-w-md mb-10">
+            {/* Email Input */}
+            <div className="max-w-md mx-auto mb-10">
               <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="email"
-                  value={email}
                   placeholder="deine@email.ch"
-                  onChange={(e) => setEmail(e.target.value.toLowerCase())}
-                  className="h-14 text-lg bg-muted/30 border-border/50 focus-ring"
+                  value={email}
+                  onChange={(e) => validateEmail(e.target.value)}
+                  className="pl-10 h-12 text-base"
                 />
+                {email && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {isValidEmail ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                  </div>
+                )}
               </div>
-              {email && emailStatus === "invalid" && (
-                <div className="flex items-center gap-2 mt-3 text-sm">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <span className="text-red-500">Ungültige E-Mail-Adresse</span>
-                </div>
-              )}
-              {email && emailStatus === "valid" && (
-                <div className="flex items-center gap-2 mt-3 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-green-500">E-Mail gültig</span>
-                </div>
+              {email && !isValidEmail && (
+                <p className="mt-2 text-sm text-red-500">Bitte gib eine gültige E-Mail-Adresse ein</p>
               )}
             </div>
-            )}
 
-            {/* Subdomain Picker - only for siloed mode */}
-            {DEPLOYMENT_MODE === "siloed" && (
-            <div className="mx-auto max-w-md mb-10">
-              <div className="relative">
-                <Input
-                  value={subdomain}
-                  placeholder="deinname"
-                  onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                  className="h-14 pr-36 text-lg bg-muted/30 border-border/50 focus-ring"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted-foreground">
-                  .{DOMAIN}
-                </span>
-              </div>
-              {subdomain && (
-                <div className="flex items-center gap-2 mt-3 text-sm">
-                  {renderStatusIcon()}
-                  <span className={
-                    subdomainStatus === "available" ? "text-green-500" : 
-                    subdomainStatus === "taken" || subdomainStatus === "invalid" ? "text-red-500" : 
-                    "text-muted-foreground"
-                  }>
-                    {statusMessage}
-                  </span>
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* Pricing Cards */}
-            <div className={`mx-auto grid max-w-5xl gap-6 ${planDetails.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-              {planDetails.map((plan) => (
+            {/* Plan Cards */}
+            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {plans.map((plan) => (
                 <Card 
                   key={plan.id} 
-                  className={`relative card-hover overflow-hidden ${
-                    plan.popular ? "border-primary shadow-lg glow" : "border-border/50"
-                  }`}
+                  className={`relative ${plan.popular ? "border-primary shadow-lg" : ""}`}
                 >
                   {plan.popular && (
-                    <div className="absolute top-0 right-0">
-                      <div className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-bl-lg">
-                        Beliebt
-                      </div>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge>Beliebt</Badge>
                     </div>
                   )}
                   <CardHeader className="text-center pb-2">
-                    {DEPLOYMENT_MODE === "siloed" && (
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <PlatformIcon className={`h-5 w-5 ${currentPlatform.color}`} />
-                      <span className="text-sm text-muted-foreground">{currentPlatform.name}</span>
-                    </div>
-                    )}
-                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    <CardTitle>{plan.name}</CardTitle>
                     <CardDescription>{plan.description}</CardDescription>
                   </CardHeader>
-                  <CardContent className="text-center pb-2">
-                    <div className="mb-2">
-                      <span className="text-5xl font-bold">{plan.price}</span>
-                      <span className="text-lg text-muted-foreground"> CHF/Mt.</span>
+                  <CardContent className="text-center">
+                    <div className="mb-4">
+                      <span className="text-4xl font-bold">{plan.price}</span>
+                      <span className="text-muted-foreground"> CHF/Monat</span>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-primary font-medium">
-                      <span>{plan.storage}</span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground text-sm">{plan.highlight}</span>
+                    <div className="mb-6 text-sm">
+                      <span className="font-medium text-primary">{plan.storage}</span>
+                      <span className="text-muted-foreground"> · {plan.photos} Fotos</span>
                     </div>
+                    <ul className="space-y-2 text-sm text-left">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-500 shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
                   </CardContent>
-                  <CardFooter className="pt-4">
-                    <Button
-                      className={`w-full h-12 text-base ${plan.popular ? "glow" : ""}`}
-                      size="lg"
-                      variant={plan.popular ? "default" : plan.id === "free" ? "secondary" : "outline"}
-                      disabled={checkoutDisabled}
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      variant={plan.variant}
+                      disabled={!isValidEmail}
                       onClick={() => handleCheckout(plan.id)}
                     >
-                      {checkoutDisabled 
-                        ? (DEPLOYMENT_MODE === "shared" ? "E-Mail eingeben" : "Subdomain wählen")
-                        : (plan.cta || `${plan.name} starten`)
-                      }
+                      {!isValidEmail ? "E-Mail eingeben" : plan.cta}
                     </Button>
                   </CardFooter>
                 </Card>
               ))}
             </div>
 
-            {/* All Features */}
-            <div className="mx-auto mt-16 max-w-2xl">
-              <h3 className="mb-6 text-center text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Alle Pläne beinhalten
-              </h3>
-              <div className="flex flex-wrap justify-center gap-3">
-                {allFeatures.map((feature) => (
-                  <Badge key={feature} variant="secondary" className="px-3 py-1.5">
-                    <Check className="mr-1.5 h-3 w-3 text-green-500" />
-                    {feature}
+            {/* All plans include */}
+            <div className="mt-12 text-center">
+              <p className="text-sm text-muted-foreground mb-4">Alle Pläne beinhalten:</p>
+              <div className="flex flex-wrap justify-center gap-4">
+                {["iOS & Android Apps", "Web-Zugang", "Automatische Backups", "DSGVO-Export", "Schweizer Hosting"].map((item) => (
+                  <Badge key={item} variant="secondary">
+                    <Check className="mr-1 h-3 w-3" />
+                    {item}
                   </Badge>
                 ))}
               </div>
@@ -634,23 +350,22 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <section id="faq" className="border-t bg-muted/30 py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="mx-auto max-w-2xl text-center mb-12">
-              <Badge variant="outline" className="mb-4">FAQ</Badge>
-              <h2 className="text-3xl font-bold md:text-4xl">Häufig gestellte Fragen</h2>
+        {/* FAQ */}
+        <section id="faq" className="py-20 bg-muted/50">
+          <div className="container">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold">Häufige Fragen</h2>
             </div>
-            <div className="mx-auto max-w-2xl space-y-3">
+            <div className="max-w-2xl mx-auto space-y-2">
               {faqs.map((faq, i) => (
                 <Card 
-                  key={i} 
-                  className="cursor-pointer border-border/50 bg-card/50 overflow-hidden"
+                  key={i}
+                  className="cursor-pointer"
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                 >
-                  <CardHeader className="pb-3">
+                  <CardHeader className="py-4">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-medium pr-8">{faq.q}</CardTitle>
+                      <CardTitle className="text-base font-medium">{faq.q}</CardTitle>
                       <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${openFaq === i ? "rotate-180" : ""}`} />
                     </div>
                   </CardHeader>
@@ -665,47 +380,42 @@ export default function Home() {
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <Card className="mx-auto max-w-4xl border-0 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground overflow-hidden">
-              <CardContent className="p-10 text-center md:p-16">
-                <h2 className="text-3xl font-bold md:text-4xl">Bereit für deine private Cloud?</h2>
-                <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
-                  Starte jetzt und sichere dir deine eigene Subdomain. In unter 3 Minuten bereit.
-                </p>
-                <div className="mt-8">
-                  <Button size="lg" variant="secondary" className="h-12 px-8 text-base font-medium" asChild>
-                    <a href="#pricing">
-                      Jetzt starten
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Final CTA */}
+        <section className="py-20">
+          <div className="container">
+            <div className="max-w-2xl mx-auto text-center">
+              <h2 className="text-3xl font-bold">Bereit loszulegen?</h2>
+              <p className="mt-4 text-muted-foreground">
+                Erstelle dein kostenloses Konto in unter einer Minute.
+              </p>
+              <Button size="lg" className="mt-8" asChild>
+                <a href="#pricing">
+                  Jetzt kostenlos starten
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            </div>
           </div>
         </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+      <footer className="border-t py-8">
+        <div className="container">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
+                <Cloud className="h-4 w-4 text-primary-foreground" />
               </div>
               <span className="font-semibold">SPhoto</span>
             </div>
-            <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <Link href="/migrate/google-photos" className="hover:text-foreground transition-colors">Migration</Link>
-              <Link href="#faq" className="hover:text-foreground transition-colors">FAQ</Link>
-              <Link href="/admin" className="hover:text-foreground transition-colors">Admin</Link>
-              <a href={`mailto:hello@${DOMAIN}`} className="hover:text-foreground transition-colors">Kontakt</a>
+            <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="#faq" className="hover:text-foreground">FAQ</Link>
+              <a href={`mailto:hello@${DOMAIN}`} className="hover:text-foreground">Kontakt</a>
+              <Link href="/admin" className="hover:text-foreground">Admin</Link>
             </nav>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} SPhoto · 🇨🇭
+              © {new Date().getFullYear()} SPhoto · Schweiz 🇨🇭
             </p>
           </div>
         </div>

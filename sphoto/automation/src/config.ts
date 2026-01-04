@@ -17,7 +17,7 @@ export const env: Env = {
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@arturf.ch',
 };
 
-export const INSTANCES_DIR = '/data/instances';
+export const INSTANCES_DIR = process.env.INSTANCES_DIR || '/data/instances';
 
 // External storage path for media files (photos/videos)
 // If not set, media is stored locally in each instance's uploads folder
@@ -32,6 +32,11 @@ export const COOLIFY_MODE = process.env.COOLIFY_MODE === 'true';
 export const NETWORK_NAME = COOLIFY_MODE ? 'coolify' : 'sphoto-net';
 
 // =============================================================================
+// Local Development Detection
+// =============================================================================
+export const IS_LOCAL_DEV = env.DOMAIN === 'localhost' || env.DOMAIN.startsWith('localhost:');
+
+// =============================================================================
 // Deployment Mode Configuration
 // =============================================================================
 // 'siloed' = One instance per user (original behavior)
@@ -40,10 +45,11 @@ export type DeploymentMode = 'siloed' | 'shared';
 export const DEPLOYMENT_MODE: DeploymentMode = (process.env.DEPLOYMENT_MODE as DeploymentMode) || 'shared';
 
 // Shared instance configuration (used when DEPLOYMENT_MODE = 'shared')
+// For local dev, use localhost:port URLs; for production use https://subdomain.domain
 export const SHARED_INSTANCES = {
   free: {
     subdomain: 'free',
-    url: `https://free.${env.DOMAIN}`,
+    url: IS_LOCAL_DEV ? 'http://localhost:2283' : `https://free.${env.DOMAIN}`,
     internalUrl: process.env.SHARED_FREE_INTERNAL_URL || `http://sphoto-free-server:2283`,
     apiKey: process.env.SHARED_FREE_API_KEY || '',
     hasML: false,
@@ -51,7 +57,7 @@ export const SHARED_INSTANCES = {
   },
   paid: {
     subdomain: 'photos',
-    url: `https://photos.${env.DOMAIN}`,
+    url: IS_LOCAL_DEV ? 'http://localhost:2284' : `https://photos.${env.DOMAIN}`,
     internalUrl: process.env.SHARED_PAID_INTERNAL_URL || `http://sphoto-paid-server:2283`,
     apiKey: process.env.SHARED_PAID_API_KEY || '',
     hasML: true,

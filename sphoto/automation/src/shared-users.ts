@@ -134,7 +134,18 @@ export async function createSharedUser(
   );
 
   if (!result.ok || !result.data) {
-    return { success: false, error: result.error || 'Failed to create user in Immich' };
+    // Parse the error to provide better messages
+    const errorMsg = result.error || 'Failed to create user in Immich';
+    
+    // Check for common errors and return user-friendly messages
+    if (errorMsg.includes('User exists') || errorMsg.includes('already exists')) {
+      return { success: false, error: 'Diese E-Mail-Adresse ist bereits registriert.' };
+    }
+    if (errorMsg.includes('Invalid email')) {
+      return { success: false, error: 'Ungültige E-Mail-Adresse.' };
+    }
+    
+    return { success: false, error: errorMsg };
   }
 
   // Save user metadata
@@ -166,9 +177,9 @@ export function getSharedUser(visibleId: string): SharedUser | null {
   return JSON.parse(readFileSync(filePath, 'utf-8'));
 }
 
-export function getSharedUserByEmail(email: string): SharedUser | null {
+export function getSharedUserByEmail(email: string, includeDeleted = false): SharedUser | null {
   const users = listSharedUsers();
-  return users.find(u => u.email === email) || null;
+  return users.find(u => u.email === email && (includeDeleted || u.status !== 'deleted')) || null;
 }
 
 export function getSharedUserByImmichId(immichUserId: string): SharedUser | null {
@@ -268,6 +279,44 @@ export async function deleteSharedUser(
   writeFileSync(getUserFilePath(visibleId), JSON.stringify(user, null, 2));
 
   console.log(`Deleted user ${user.email} from ${user.instance} instance`);
+  return { success: true };
+}
+
+/**
+ * Completely purge a user - removes from Immich AND deletes local JSON file.
+ * Used by the nuke endpoint for clean testing.
+ */
+export async function purgeSharedUser(
+  visibleId: string
+): Promise<{ success: boolean; error?: string }> {
+  const user = getSharedUser(visibleId);
+  if (!user) return { success: false, error: 'User not found' };
+
+  // Try to delete from Immich (ignore errors - user might already be deleted)
+  if (user.status !== 'deleted') {
+    const result = await immichApiCall<void>(
+      user.instance,
+      `/api/admin/users/${user.immichUserId}`,
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ force: true }),
+      }
+    );
+
+    if (!result.ok) {
+      console.log(`Warning: Could not delete ${user.email} from Immich: ${result.error}`);
+      // Continue anyway - we'll still remove the local file
+    }
+  }
+
+  // Remove the local JSON file entirely
+  const filePath = getUserFilePath(visibleId);
+  if (existsSync(filePath)) {
+    const { unlinkSync } = await import('fs');
+    unlinkSync(filePath);
+    console.log(`Purged user file for ${user.email}`);
+  }
+
   return { success: true };
 }
 

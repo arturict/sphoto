@@ -12,7 +12,7 @@ import { INSTANCES_DIR, EXTERNAL_STORAGE_PATH, env } from './config';
 
 const execAsync = promisify(exec);
 
-const EXPORTS_DIR = '/data/exports';
+const EXPORTS_DIR = join(INSTANCES_DIR, '..', 'exports');
 const EXPORT_EXPIRY_HOURS = 24;
 
 // In-memory job storage (consider SQLite for production)

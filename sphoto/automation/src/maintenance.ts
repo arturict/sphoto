@@ -4,12 +4,10 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { Resend } from 'resend';
 import { env, INSTANCES_DIR } from './config';
+import { getResend } from './lib/resend';
 import { listInstances, getInstance } from './instances';
 import type { InstanceMetadata } from './types';
-
-const resend = new Resend(env.RESEND_API_KEY);
 
 // =============================================================================
 // Types
@@ -109,6 +107,12 @@ async function sendMaintenanceScheduledEmail(
   email: string,
   maintenance: Maintenance
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send maintenance scheduled email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const startDate = new Date(maintenance.scheduledStart);
   const endDate = new Date(maintenance.scheduledEnd);
   const duration = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60));
@@ -179,6 +183,12 @@ async function sendMaintenanceReminderEmail(
   email: string,
   maintenance: Maintenance
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send maintenance reminder email to ${email} (Resend not configured)`);
+    return;
+  }
+
   const startDate = new Date(maintenance.scheduledStart);
   
   await resend.emails.send({
@@ -216,6 +226,12 @@ async function sendMaintenanceStartedEmail(
   email: string,
   maintenance: Maintenance
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send maintenance started email to ${email} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
@@ -252,6 +268,12 @@ async function sendMaintenanceCompletedEmail(
   email: string,
   maintenance: Maintenance
 ): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send maintenance completed email to ${email} (Resend not configured)`);
+    return;
+  }
+
   await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
