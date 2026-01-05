@@ -59,18 +59,27 @@ docker ps -a | grep sphoto
 docker compose down --remove-orphans
 docker compose up -d --build
 
-# Run automation server locally (requires Bun)
-cd automation
-bun install
-bun run dev          # watch mode
-bun run typecheck    # TypeScript check
+# =============================================================================
+# LOCAL DEVELOPMENT (requires Bun)
+# =============================================================================
+# First-time setup:
+./scripts/dev-setup.sh
 
-# Run web app locally (requires Node 20+)
-cd web
-npm install
-npm run dev          # Next.js dev server on :3000
-npm run build        # production build
-npm run lint         # ESLint
+# Or manually:
+make dev-setup       # Creates .env.local, installs deps
+make dev             # Start Immich containers
+make web             # Start web on :3000 (Terminal 1)
+make automation      # Start automation on :3001 (Terminal 2)
+
+# Individual commands:
+cd web && bun install && bun run dev         # Web dev server
+cd automation && bun install && bun run dev  # Automation dev server
+
+# Code quality:
+make typecheck       # TypeScript check (automation)
+make lint            # ESLint (web)
+
+# See docs/LOCAL-DEVELOPMENT.md for detailed instructions
 
 # Health check
 curl https://api.sphoto.arturf.ch/health
@@ -141,8 +150,8 @@ curl https://api.sphoto.arturf.ch/health
 | Layer       | Tool          | Command            | Notes                                   |
 |-------------|---------------|--------------------|-----------------------------------------|
 | Unit        | Bun Test      | `bun test`         | Automation server logic                 |
-| Lint        | ESLint        | `npm run lint`     | Web app (Next.js config)                |
-| Type-check  | TypeScript    | `bun run typecheck`| Automation; `npx tsc --noEmit` for web  |
+| Lint        | ESLint        | `bun run lint`     | Web app (via Next.js config)            |
+| Type-check  | TypeScript    | `bun run typecheck`| Automation; `bun run typecheck` for web |
 | E2E         | —             | —                  | > TODO: Playwright for checkout flow    |
 | CI          | —             | —                  | > TODO: GitHub Actions workflow         |
 
@@ -176,7 +185,7 @@ curl https://api.sphoto.arturf.ch/health
 
 4. **Testing before merge:**
    - Run `bun run typecheck` in `automation/`.
-   - Run `npm run lint && npm run build` in `web/`.
+   - Run `bun run lint && bun run build` in `web/`.
 
 ## Extensibility Hooks
 

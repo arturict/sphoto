@@ -1,16 +1,19 @@
 # =============================================================================
 # SPhoto Development Makefile
 # =============================================================================
+# Uses Bun for all JavaScript/TypeScript operations
+# Run 'make help' to see all available commands
 
-.PHONY: dev dev-down dev-logs dev-setup web automation help nuke users stripe-listen
+.PHONY: help dev dev-setup dev-down dev-logs web automation immich immich-down \
+        immich-logs install clean clean-web typecheck lint users nuke stripe-listen
 
 # Default target
 help:
 	@echo "SPhoto Development Commands"
 	@echo "==========================="
 	@echo ""
-	@echo "Setup:"
-	@echo "  make dev-setup    - First-time setup (copy env, create dirs)"
+	@echo "Quick Start:"
+	@echo "  make dev-setup    - First-time setup (creates .env.local, installs deps)"
 	@echo "  make dev          - Start Immich containers"
 	@echo "  make web          - Start web dev server (port 3000)"
 	@echo "  make automation   - Start automation server (port 3001)"
@@ -21,6 +24,11 @@ help:
 	@echo "  make dev-down     - Stop all containers"
 	@echo "  make dev-logs     - Follow container logs"
 	@echo ""
+	@echo "Dependencies:"
+	@echo "  make install      - Install all dependencies (web + automation)"
+	@echo "  make install-web  - Install web dependencies only"
+	@echo "  make install-auto - Install automation dependencies only"
+	@echo ""
 	@echo "Testing:"
 	@echo "  make users        - List all shared users"
 	@echo "  make nuke         - Delete all shared users (for testing)"
@@ -29,7 +37,11 @@ help:
 	@echo "Code Quality:"
 	@echo "  make typecheck    - Run TypeScript checks (automation)"
 	@echo "  make lint         - Run ESLint (web)"
+	@echo ""
+	@echo "Cleanup:"
 	@echo "  make clean        - Remove all local data and containers"
+	@echo "  make clean-web    - Remove web node_modules and .next"
+	@echo "  make clean-auto   - Remove automation node_modules"
 	@echo ""
 	@echo "Local URLs:"
 	@echo "  - Web:          http://localhost:3000"
@@ -37,18 +49,7 @@ help:
 	@echo "  - Free Immich:  http://localhost:2283"
 	@echo "  - Paid Immich:  http://localhost:2284"
 	@echo ""
-	@echo "First-time setup:"
-	@echo "  1. make dev-setup"
-	@echo "  2. make dev"
-	@echo "  3. Go to http://localhost:2283, create admin, get API key"
-	@echo "  4. Add API key to .env.local as SHARED_FREE_API_KEY"
-	@echo "  5. Repeat for http://localhost:2284 (SHARED_PAID_API_KEY)"
-	@echo "  6. Start: make web (terminal 1), make automation (terminal 2)"
-	@echo ""
-	@echo "To test paid subscriptions:"
-	@echo "  1. Add Stripe test keys to .env.local"
-	@echo "  2. Run: make stripe-listen (in separate terminal)"
-	@echo "  3. Use test card: 4242 4242 4242 4242"
+	@echo "For detailed setup instructions, see: docs/LOCAL-DEVELOPMENT.md"
 	@echo ""
 
 # =============================================================================
@@ -56,19 +57,21 @@ help:
 # =============================================================================
 dev-setup:
 	@echo "Setting up local development environment..."
-	@if [ ! -f .env.local ]; then \
-		cp .env.local.example .env.local; \
-		echo "Created .env.local from template"; \
-	else \
-		echo ".env.local already exists, skipping"; \
-	fi
-	@mkdir -p .local/instances/_shared_users
-	@mkdir -p .local/free/uploads .local/free/db
-	@mkdir -p .local/paid/uploads .local/paid/db
-	@echo ""
-	@echo "Setup complete! Next steps:"
-	@echo "  1. Edit .env.local with your settings"
-	@echo "  2. Run 'make dev' to start everything"
+	@./scripts/dev-setup.sh
+
+# =============================================================================
+# Install dependencies
+# =============================================================================
+install: install-web install-auto
+	@echo "All dependencies installed!"
+
+install-web:
+	@echo "Installing web dependencies..."
+	@cd web && bun install
+
+install-auto:
+	@echo "Installing automation dependencies..."
+	@cd automation && bun install
 
 # =============================================================================
 # Full development stack
@@ -85,7 +88,7 @@ dev: immich
 
 dev-all: immich
 	@echo "Starting web and automation in background..."
-	@cd web && npm install && npm run dev &
+	@cd web && bun install && bun run dev &
 	@cd automation && bun install && bun run dev &
 	@echo "All services started in background"
 
@@ -116,35 +119,53 @@ immich-logs:
 # =============================================================================
 web:
 	@echo "Starting web dev server on http://localhost:3000..."
-	@if [ -f .env.local ]; then \
-		set -a && . ./.env.local && set +a && cd web && npm install && PORT=3000 npm run dev; \
-	else \
+	@if [ ! -f .env.local ]; then \
 		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
 		exit 1; \
 	fi
+	@set -a && . ./.env.local && set +a && \
+		cd web && bun install && PORT=3000 bun run dev
 
 automation:
 	@echo "Starting automation dev server on http://localhost:3001..."
-	@if [ -f .env.local ]; then \
-		set -a && . ./.env.local && set +a && cd automation && bun install && PORT=3001 bun run dev; \
-	else \
+	@if [ ! -f .env.local ]; then \
 		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
 		exit 1; \
 	fi
+	@set -a && . ./.env.local && set +a && \
+		cd automation && bun install && PORT=3001 bun run dev
 
 # =============================================================================
-# Utilities
+# Code Quality
 # =============================================================================
 typecheck:
 	cd automation && bun run typecheck
 
 lint:
-	cd web && npm run lint
+	cd web && bun run lint
 
-clean:
-	docker compose -f docker-compose.local.yml down -v
+# =============================================================================
+# Cleanup
+# =============================================================================
+clean: immich-down
+	docker compose -f docker-compose.local.yml down -v 2>/dev/null || true
 	rm -rf .local
 	@echo "Cleaned up all local data and volumes"
+
+clean-web:
+	@echo "Cleaning web build artifacts..."
+	rm -rf web/node_modules web/.next web/bun.lockb
+
+clean-auto:
+	@echo "Cleaning automation build artifacts..."
+	rm -rf automation/node_modules automation/bun.lockb
+
+clean-all: clean-web clean-auto
+	@echo "All node_modules cleaned"
+
+# =============================================================================
+# Testing utilities
+# =============================================================================
 
 # Delete all shared users (for testing)
 nuke:

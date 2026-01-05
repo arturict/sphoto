@@ -146,6 +146,51 @@ curl -X POST https://api.sphoto.arturf.ch/signup/free \
 
 ---
 
+## 🧑‍💻 Local Development
+
+For detailed local development instructions, see **[docs/LOCAL-DEVELOPMENT.md](docs/LOCAL-DEVELOPMENT.md)**.
+
+### Quick Start
+
+```bash
+# 1. First-time setup (creates .env.local, installs deps)
+./scripts/dev-setup.sh
+
+# 2. Start Immich containers
+make dev
+
+# 3. In separate terminals:
+make web          # http://localhost:3000
+make automation   # http://localhost:3001
+```
+
+### Prerequisites
+
+- **Bun** 1.0+ (`curl -fsSL https://bun.sh/install | bash`)
+- **Docker** with Docker Compose
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make dev-setup` | First-time setup |
+| `make dev` | Start Immich containers |
+| `make web` | Start web (port 3000) |
+| `make automation` | Start API (port 3001) |
+| `make install` | Install all dependencies |
+| `make clean` | Remove all local data |
+
+### Local URLs
+
+- **Web**: http://localhost:3000
+- **Automation API**: http://localhost:3001
+- **Free Immich**: http://localhost:2283
+- **Paid Immich**: http://localhost:2284
+
+> **Note**: This project uses **Bun** for all JavaScript/TypeScript operations. If you previously used npm and encounter issues, run `make clean-web && make install`.
+
+---
+
 ## 🔄 Automatischer Ablauf (Shared Mode)
 
 ### Free Tier
