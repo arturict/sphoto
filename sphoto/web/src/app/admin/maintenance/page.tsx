@@ -13,18 +13,20 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   ArrowLeft,
-  Wrench,
+  AlertTriangle,
+  Calendar,
+  CheckCircle,
+  Clock,
+  HardDrive,
+  Mail,
+  Play,
   Plus,
   RefreshCw,
-  CheckCircle,
-  XCircle,
-  Play,
-  Square,
-  Calendar,
-  Clock,
+  Rocket,
   Server,
-  AlertTriangle,
   Trash2,
+  Wrench,
+  XCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -61,11 +63,22 @@ const typeLabels: Record<MaintenanceType, string> = {
   emergency: "Notfall-Wartung",
 }
 
-const typeIcons: Record<MaintenanceType, string> = {
-  update: "🔧",
-  backup: "💾",
-  migration: "🚀",
-  emergency: "⚠️",
+const typeIcons: Record<MaintenanceType, typeof Wrench> = {
+  update: Wrench,
+  backup: HardDrive,
+  migration: Rocket,
+  emergency: AlertTriangle,
+}
+
+function MaintenanceTypeIcon({
+  type,
+  className,
+}: {
+  type: MaintenanceType
+  className?: string
+}) {
+  const Icon = typeIcons[type]
+  return <Icon className={className ?? "h-5 w-5"} />
 }
 
 const statusLabels: Record<MaintenanceStatus, string> = {
@@ -386,7 +399,7 @@ export default function MaintenancePage() {
                   >
                     {Object.entries(typeLabels).map(([type, label]) => (
                       <option key={type} value={type}>
-                        {typeIcons[type as MaintenanceType]} {label}
+                        {label}
                       </option>
                     ))}
                   </select>
@@ -449,7 +462,7 @@ export default function MaintenancePage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{typeIcons[m.type]}</span>
+                          <MaintenanceTypeIcon type={m.type} className="h-5 w-5 text-amber-600" />
                           <h4 className="font-semibold">{m.title}</h4>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
@@ -494,7 +507,7 @@ export default function MaintenancePage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{typeIcons[m.type]}</span>
+                          <MaintenanceTypeIcon type={m.type} className="h-5 w-5 text-muted-foreground" />
                           <h4 className="font-semibold">{m.title}</h4>
                           <Badge className={statusColors[m.status]}>{statusLabels[m.status]}</Badge>
                         </div>
@@ -506,8 +519,16 @@ export default function MaintenancePage() {
                           <span>({formatDuration(m.scheduledStart, m.scheduledEnd)})</span>
                         </div>
                         <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                          {m.notificationsSent.scheduled && <Badge variant="outline">📧 48h</Badge>}
-                          {m.notificationsSent.reminder && <Badge variant="outline">📧 2h</Badge>}
+                          {m.notificationsSent.scheduled && (
+                            <Badge variant="outline" className="flex items-center gap-1.5">
+                              <Mail className="h-3 w-3" /> 48h
+                            </Badge>
+                          )}
+                          {m.notificationsSent.reminder && (
+                            <Badge variant="outline" className="flex items-center gap-1.5">
+                              <Mail className="h-3 w-3" /> 2h
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -550,7 +571,7 @@ export default function MaintenancePage() {
                 {past.slice(0, 10).map((m) => (
                   <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div className="flex items-center gap-3">
-                      <span>{typeIcons[m.type]}</span>
+                      <MaintenanceTypeIcon type={m.type} className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-medium">{m.title}</p>
                         <p className="text-xs text-muted-foreground">{formatDateTime(m.scheduledStart)}</p>

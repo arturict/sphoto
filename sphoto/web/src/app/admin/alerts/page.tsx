@@ -13,16 +13,18 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   ArrowLeft,
-  Bell,
   AlertTriangle,
-  HardDrive,
+  Bell,
+  CheckCircle,
   Clock,
+  HardDrive,
   RefreshCw,
   Send,
-  CheckCircle,
-  XCircle,
-  Users,
   Server,
+  ServerOff,
+  TrendingDown,
+  Users,
+  XCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -56,14 +58,21 @@ const alertTypeLabels: Record<string, string> = {
   backup_failed: "Backup Failed",
 }
 
-const alertTypeIcons: Record<string, string> = {
-  storage_80: "🟡",
-  storage_90: "🟠",
-  storage_100: "🔴",
-  inactive: "😴",
-  churn_risk: "📉",
-  instance_down: "🚨",
-  backup_failed: "💾",
+const alertTypeIcons: Record<string, { Icon: typeof Bell; className: string }> = {
+  storage_80: { Icon: HardDrive, className: "text-amber-500" },
+  storage_90: { Icon: HardDrive, className: "text-orange-500" },
+  storage_100: { Icon: HardDrive, className: "text-destructive" },
+  inactive: { Icon: Clock, className: "text-muted-foreground" },
+  churn_risk: { Icon: TrendingDown, className: "text-amber-500" },
+  instance_down: { Icon: ServerOff, className: "text-destructive" },
+  backup_failed: { Icon: AlertTriangle, className: "text-destructive" },
+}
+
+function AlertTypeIcon({ type, className }: { type: string; className?: string }) {
+  const entry = alertTypeIcons[type]
+  const Icon = entry?.Icon ?? Bell
+  const base = `h-5 w-5 ${entry?.className ?? "text-muted-foreground"}`
+  return <Icon className={className ? `${base} ${className}` : base} />
 }
 
 function formatDate(dateStr: string): string {
@@ -316,7 +325,7 @@ export default function AlertsPage() {
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
               {Object.entries(alertTypeLabels).map(([type, label]) => (
                 <div key={type} className="flex items-center gap-3 p-3 rounded-lg border">
-                  <span className="text-2xl">{alertTypeIcons[type]}</span>
+                  <AlertTypeIcon type={type} className="h-6 w-6" />
                   <div>
                     <p className="font-medium">{label}</p>
                     <p className="text-xs text-muted-foreground">
@@ -353,7 +362,7 @@ export default function AlertsPage() {
                   {Object.entries(alertsByType).map(([type, typeAlerts]) => (
                     <div key={type}>
                       <h4 className="font-medium flex items-center gap-2 mb-2">
-                        <span>{alertTypeIcons[type]}</span>
+                        <AlertTypeIcon type={type} />
                         {alertTypeLabels[type]} ({typeAlerts.length})
                       </h4>
                       <div className="space-y-2 pl-6">
@@ -404,7 +413,7 @@ export default function AlertsPage() {
                 >
                   {Object.entries(alertTypeLabels).map(([type, label]) => (
                     <option key={type} value={type}>
-                      {alertTypeIcons[type]} {label}
+                      {label}
                     </option>
                   ))}
                 </select>

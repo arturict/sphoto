@@ -302,6 +302,7 @@ export default function BrandingPage() {
                   />
                   {branding.logo_url && (
                     <div className="p-4 bg-muted rounded-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={branding.logo_url} 
                         alt="Logo Preview" 
@@ -329,6 +330,7 @@ export default function BrandingPage() {
                   />
                   {branding.favicon_url && (
                     <div className="flex items-center gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={branding.favicon_url} 
                         alt="Favicon Preview" 

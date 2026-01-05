@@ -12,17 +12,18 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
-  ArrowLeft,
-  BarChart3,
-  TrendingUp,
-  HardDrive,
-  Users,
-  AlertTriangle,
-  RefreshCw,
   Activity,
-  Calendar,
-  ArrowUpRight,
+  AlertTriangle,
   ArrowDownRight,
+  ArrowLeft,
+  ArrowUpRight,
+  BarChart3,
+  Calendar,
+  CheckCircle,
+  HardDrive,
+  RefreshCw,
+  TrendingUp,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -517,8 +518,9 @@ export default function AnalyticsPage() {
                 </CardHeader>
                 <CardContent>
                   {analytics.churnRisk.length === 0 ? (
-                    <p className="text-sm text-green-600 flex items-center gap-2">
-                      ✓ Keine gefährdeten Instanzen
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-foreground" />
+                      Keine gefährdeten Instanzen
                     </p>
                   ) : (
                     <div className="space-y-3">

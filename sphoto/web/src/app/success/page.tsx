@@ -13,10 +13,10 @@ import {
   Mail,
   Smartphone,
   Download,
-  Sparkles,
   XCircle,
   Cloud,
   Camera,
+  ArrowRight,
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
@@ -204,22 +204,21 @@ function SuccessContent() {
   if (isFreeSignup) {
     return (
       <Card className="max-w-lg w-full">
-        <CardHeader className="text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+        <CardHeader className="text-center pb-4">
+          <CheckCircle className="h-14 w-14 text-foreground mx-auto mb-4" />
           <CardTitle className="text-2xl flex items-center justify-center gap-2">
-            Dein Konto ist bereit!
-            <Sparkles className="h-5 w-5 text-primary" />
+            Dein Konto ist bereit
           </CardTitle>
           <CardDescription>Du kannst dich jetzt anmelden und loslegen.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="bg-muted rounded-lg p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-1">Deine URL:</p>
+          <div className="bg-secondary rounded-xl p-5 text-center">
+            <p className="text-sm text-muted-foreground mb-2">Deine URL:</p>
             <a
               href={freeInstance}
               target="_blank"
               rel="noreferrer"
-              className="text-xl font-semibold text-primary hover:underline inline-flex items-center gap-2"
+              className="text-lg font-semibold text-foreground hover:underline inline-flex items-center gap-2"
             >
               {freeInstance.replace("https://", "").replace("http://", "")}
               <ExternalLink className="h-4 w-4" />
@@ -228,40 +227,40 @@ function SuccessContent() {
 
           <div className="flex gap-2 justify-center flex-wrap">
             <Badge variant="secondary">Free</Badge>
-            <Badge variant="outline" className="flex items-center gap-1">
+            <Badge variant="outline" className="flex items-center gap-1.5">
               <Camera className="h-3 w-3" /> Immich
             </Badge>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
+          <div className="space-y-5">
+            <div className="flex items-start gap-4">
               <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">E-Mail gesendet</p>
-                <p className="text-sm text-muted-foreground">
-                  Deine Login-Daten wurden an <span className="font-mono">{freeEmail}</span> gesendet.
+                <p className="text-sm text-muted-foreground mt-1">
+                  Deine Login-Daten wurden an <span className="font-mono text-foreground">{freeEmail}</span> gesendet.
                 </p>
-                <div className="mt-2">
+                <div className="mt-3">
                   <EmailLink email={freeEmail} />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-4">
               <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Mobile App</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-1">
                   Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
                 </p>
-                <div className="mt-2 flex gap-2 flex-wrap">
+                <div className="mt-3 flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" asChild>
                     <a
                       href="https://apps.apple.com/app/immich/id1613945652"
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <Download className="mr-1 h-3 w-3" /> iOS
+                      <Download className="mr-1.5 h-3 w-3" /> iOS
                     </a>
                   </Button>
                   <Button variant="outline" size="sm" asChild>
@@ -270,7 +269,7 @@ function SuccessContent() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <Download className="mr-1 h-3 w-3" /> Android
+                      <Download className="mr-1.5 h-3 w-3" /> Android
                     </a>
                   </Button>
                 </div>
@@ -281,7 +280,7 @@ function SuccessContent() {
           <Button className="w-full" size="lg" asChild>
             <a href={freeInstance} target="_blank" rel="noreferrer">
               Zur Cloud öffnen
-              <ExternalLink className="ml-2 h-4 w-4" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </a>
           </Button>
         </CardContent>
@@ -309,31 +308,35 @@ function SuccessContent() {
   if (status.status === "processing" || status.status === "pending") {
     return (
       <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
-          <Loader2 className="h-14 w-14 animate-spin mx-auto text-primary mb-4" />
+        <CardHeader className="text-center pb-4">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-foreground mb-4" />
           <CardTitle>Deine Cloud wird erstellt...</CardTitle>
           <CardDescription>Das dauert normalerweise 1–2 Minuten.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-primary h-full transition-all duration-500"
+              className="bg-foreground h-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="space-y-2 text-sm">
-            <p className={progress >= 10 ? "text-green-600" : "text-muted-foreground"}>
-              {progress >= 10 ? "✓" : "○"} Zahlung erhalten
-            </p>
-            <p className={progress >= 40 ? "text-green-600" : progress >= 10 ? "animate-pulse text-primary" : "text-muted-foreground"}>
-              {progress >= 40 ? "✓" : progress >= 10 ? "⏳" : "○"} Container werden gestartet
-            </p>
-            <p className={progress >= 70 ? "text-green-600" : progress >= 40 ? "animate-pulse text-primary" : "text-muted-foreground"}>
-              {progress >= 70 ? "✓" : progress >= 40 ? "⏳" : "○"} SSL-Zertifikat wird erstellt
-            </p>
-            <p className={progress >= 100 ? "text-green-600" : progress >= 70 ? "animate-pulse text-primary" : "text-muted-foreground"}>
-              {progress >= 100 ? "✓" : progress >= 70 ? "⏳" : "○"} Account wird eingerichtet
-            </p>
+          <div className="space-y-3 text-sm">
+            <div className={`flex items-center gap-3 ${progress >= 10 ? "text-foreground" : "text-muted-foreground"}`}>
+              {progress >= 10 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
+              Zahlung erhalten
+            </div>
+            <div className={`flex items-center gap-3 ${progress >= 40 ? "text-foreground" : progress >= 10 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
+              {progress >= 40 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
+              Container werden gestartet
+            </div>
+            <div className={`flex items-center gap-3 ${progress >= 70 ? "text-foreground" : progress >= 40 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
+              {progress >= 70 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
+              SSL-Zertifikat wird erstellt
+            </div>
+            <div className={`flex items-center gap-3 ${progress >= 100 ? "text-foreground" : progress >= 70 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
+              {progress >= 100 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
+              Account wird eingerichtet
+            </div>
           </div>
           <p className="text-xs text-center text-muted-foreground">
             Diese Seite aktualisiert sich automatisch.
@@ -368,22 +371,21 @@ function SuccessContent() {
   // Success!
   return (
     <Card className="max-w-lg w-full">
-      <CardHeader className="text-center">
-        <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+      <CardHeader className="text-center pb-4">
+        <CheckCircle className="h-14 w-14 text-foreground mx-auto mb-4" />
         <CardTitle className="text-2xl flex items-center justify-center gap-2">
-          Deine Cloud ist bereit!
-          <Sparkles className="h-5 w-5 text-primary" />
+          Deine Cloud ist bereit
         </CardTitle>
         <CardDescription>Du kannst dich jetzt anmelden und loslegen.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="bg-muted rounded-lg p-4 text-center">
-          <p className="text-sm text-muted-foreground mb-1">Deine URL:</p>
+        <div className="bg-secondary rounded-xl p-5 text-center">
+          <p className="text-sm text-muted-foreground mb-2">Deine URL:</p>
           <a
             href={status.instanceUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-xl font-semibold text-primary hover:underline inline-flex items-center gap-2"
+            className="text-lg font-semibold text-foreground hover:underline inline-flex items-center gap-2"
           >
             {status.instanceUrl?.replace("https://", "")}
             <ExternalLink className="h-4 w-4" />
@@ -392,49 +394,49 @@ function SuccessContent() {
 
         <div className="flex gap-2 justify-center flex-wrap">
           <Badge variant="secondary">{status.plan}</Badge>
-          <Badge variant="outline" className="flex items-center gap-1">
+          <Badge variant="outline" className="flex items-center gap-1.5">
             {status.platform === "nextcloud" ? (
               <><Cloud className="h-3 w-3" /> Nextcloud</>
             ) : (
               <><Camera className="h-3 w-3" /> Immich</>
             )}
           </Badge>
-          {status.autoSetup && <Badge variant="success">Auto-Setup ✓</Badge>}
+          {status.autoSetup && <Badge variant="success">Auto-Setup</Badge>}
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-start gap-3">
+        <div className="space-y-5">
+          <div className="flex items-start gap-4">
             <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
               <p className="font-medium">E-Mail gesendet</p>
-              <p className="text-sm text-muted-foreground">
-                Deine Login-Daten wurden an <span className="font-mono">{status.email}</span> gesendet.
+              <p className="text-sm text-muted-foreground mt-1">
+                Deine Login-Daten wurden an <span className="font-mono text-foreground">{status.email}</span> gesendet.
               </p>
               {status.email && (
-                <div className="mt-2">
+                <div className="mt-3">
                   <EmailLink email={status.email} />
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-4">
             <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
               <p className="font-medium">Mobile App</p>
               {status.platform === "nextcloud" ? (
                 <>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Lade die <strong>Nextcloud</strong> App und verbinde mit deiner URL.
                   </p>
-                  <div className="mt-2 flex gap-2 flex-wrap">
+                  <div className="mt-3 flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
                       <a
                         href="https://apps.apple.com/app/nextcloud/id1125420102"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Download className="mr-1 h-3 w-3" /> iOS
+                        <Download className="mr-1.5 h-3 w-3" /> iOS
                       </a>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
@@ -443,7 +445,7 @@ function SuccessContent() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Download className="mr-1 h-3 w-3" /> Android
+                        <Download className="mr-1.5 h-3 w-3" /> Android
                       </a>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
@@ -452,24 +454,24 @@ function SuccessContent() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Download className="mr-1 h-3 w-3" /> Desktop
+                        <Download className="mr-1.5 h-3 w-3" /> Desktop
                       </a>
                     </Button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
                   </p>
-                  <div className="mt-2 flex gap-2 flex-wrap">
+                  <div className="mt-3 flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
                       <a
                         href="https://apps.apple.com/app/immich/id1613945652"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Download className="mr-1 h-3 w-3" /> iOS
+                        <Download className="mr-1.5 h-3 w-3" /> iOS
                       </a>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
@@ -478,7 +480,7 @@ function SuccessContent() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Download className="mr-1 h-3 w-3" /> Android
+                        <Download className="mr-1.5 h-3 w-3" /> Android
                       </a>
                     </Button>
                   </div>
@@ -491,7 +493,7 @@ function SuccessContent() {
         <Button className="w-full" size="lg" asChild>
           <a href={status.instanceUrl} target="_blank" rel="noreferrer">
             Zur Cloud öffnen
-            <ExternalLink className="ml-2 h-4 w-4" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </a>
         </Button>
       </CardContent>
@@ -501,12 +503,12 @@ function SuccessContent() {
 
 export default function SuccessPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Suspense
         fallback={
           <Card className="max-w-md w-full">
             <CardContent className="py-12 text-center">
-              <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+              <Loader2 className="h-10 w-10 animate-spin mx-auto text-foreground" />
               <p className="mt-4 text-sm text-muted-foreground">Lade Status...</p>
             </CardContent>
           </Card>

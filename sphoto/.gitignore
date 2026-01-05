@@ -1,0 +1,9 @@
+# Local environment files
+.env.local
+
+# Local helper file(s)
+2q
+
+# Local runtime/state (do not commit)
+.local/
+automation/.local/

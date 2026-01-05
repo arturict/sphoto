@@ -292,11 +292,23 @@ export default function PlansPage() {
                   <ArrowUp className="h-5 w-5 text-green-600" />
                   <h4 className="font-semibold text-green-600">Upgrade (Basic → Pro)</h4>
                 </div>
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>✓ Sofort wirksam</li>
-                  <li>✓ Anteilige Verrechnung (Proration)</li>
-                  <li>✓ Keine Downtime</li>
-                  <li>✓ Quota wird auf 1 TB erhöht</li>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Sofort wirksam</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Anteilige Verrechnung (Proration)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Keine Downtime</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Quota wird auf 1 TB erhöht</span>
+                  </li>
                 </ul>
               </div>
               <div className="p-4 rounded-lg border bg-amber-50 dark:bg-amber-500/10">
@@ -304,11 +316,23 @@ export default function PlansPage() {
                   <ArrowDown className="h-5 w-5 text-amber-600" />
                   <h4 className="font-semibold text-amber-600">Downgrade (Pro → Basic)</h4>
                 </div>
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>⚠️ Nur wenn Nutzung &lt; 200 GB</li>
-                  <li>⚠️ Wirksam zum Billing-Ende</li>
-                  <li>✓ Keine Datenverlust</li>
-                  <li>✓ Quota wird auf 200 GB gesenkt</li>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <span>Nur wenn Nutzung &lt; 200 GB</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <span>Wirksam zum Billing-Ende</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Kein Datenverlust</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    <span>Quota wird auf 200 GB gesenkt</span>
+                  </li>
                 </ul>
               </div>
             </div>

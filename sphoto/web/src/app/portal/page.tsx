@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -36,8 +36,8 @@ import {
   Image,
   Loader2,
   LogOut,
-  Sparkles,
   Trash2,
+  X,
   Video,
   AlertTriangle,
   CheckCircle,
@@ -70,7 +70,7 @@ export default function PortalPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     }>
       <PortalContent />
@@ -87,25 +87,34 @@ function PortalContent() {
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Check for token in URL (magic link) or localStorage
-  useEffect(() => {
-    const urlToken = searchParams.get("token")
-    if (urlToken) {
-      // Validate and store token
-      validateToken(urlToken)
-    } else {
-      // Check localStorage
-      const storedToken = localStorage.getItem("portal_token")
-      if (storedToken) {
-        setToken(storedToken)
-        fetchDashboard(storedToken)
-      } else {
+  const fetchDashboard = useCallback(async (authToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/portal/dashboard`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem("portal_token")
+          setToken(null)
+          setError("Session expired. Please login again.")
+        } else {
+          setError("Failed to load dashboard")
+        }
         setLoading(false)
+        return
       }
-    }
-  }, [searchParams])
 
-  async function validateToken(urlToken: string) {
+      const dashboardData = await res.json()
+      setData(dashboardData)
+      setLoading(false)
+    } catch (err) {
+      setError("Failed to load dashboard")
+      setLoading(false)
+    }
+  }, [])
+
+  const validateToken = useCallback(async (urlToken: string) => {
     try {
       const res = await fetch(`${API_URL}/portal/auth`, {
         method: "POST",
@@ -131,34 +140,25 @@ function PortalContent() {
       setError("Failed to validate login")
       setLoading(false)
     }
-  }
+  }, [router, fetchDashboard])
 
-  async function fetchDashboard(authToken: string) {
-    try {
-      const res = await fetch(`${API_URL}/portal/dashboard`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      })
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem("portal_token")
-          setToken(null)
-          setError("Session expired. Please login again.")
-        } else {
-          setError("Failed to load dashboard")
-        }
+  // Check for token in URL (magic link) or localStorage
+  useEffect(() => {
+    const urlToken = searchParams.get("token")
+    if (urlToken) {
+      // Validate and store token
+      validateToken(urlToken)
+    } else {
+      // Check localStorage
+      const storedToken = localStorage.getItem("portal_token")
+      if (storedToken) {
+        setToken(storedToken)
+        fetchDashboard(storedToken)
+      } else {
         setLoading(false)
-        return
       }
-
-      const dashboardData = await res.json()
-      setData(dashboardData)
-      setLoading(false)
-    } catch (err) {
-      setError("Failed to load dashboard")
-      setLoading(false)
     }
-  }
+  }, [searchParams, validateToken, fetchDashboard])
 
   async function handleLogout() {
     if (!token) return
@@ -260,7 +260,7 @@ function PortalContent() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     )
   }
@@ -286,9 +286,9 @@ function PortalContent() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
+              <Cloud className="h-4 w-4 text-background" />
             </div>
             <span>SPhoto</span>
           </Link>
@@ -333,7 +333,9 @@ function PortalContent() {
           <Card className="mb-6 border-destructive bg-destructive/10">
             <CardContent className="flex items-center justify-between p-4">
               <p className="text-destructive">{error}</p>
-              <Button variant="ghost" size="sm" onClick={() => setError(null)}>×</Button>
+              <Button variant="ghost" size="icon" onClick={() => setError(null)} aria-label="Schliessen">
+                <X className="h-4 w-4" />
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -600,9 +602,9 @@ function LoginForm({ onSuccess }: { onSuccess: (token: string) => void }) {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Link href="/" className="mx-auto mb-4 flex items-center gap-2 text-xl font-bold">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <Link href="/" className="mx-auto mb-4 flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
+              <Cloud className="h-4 w-4 text-background" />
             </div>
             <span>SPhoto</span>
           </Link>
