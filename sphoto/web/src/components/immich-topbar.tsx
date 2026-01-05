@@ -11,7 +11,7 @@ export function ImmichTopBar() {
                 </div>
                 <input
                     type="text"
-                    placeholder="Search your photos"
+                    placeholder="Photos suchen"
                     className="w-full bg-white/5 border border-white/10 rounded-lg py-1.5 pl-10 pr-10 text-xs text-white/80 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40">
@@ -32,7 +32,7 @@ export function ImmichTopBar() {
                     <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full" />
                 </button>
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white cursor-pointer overflow-hidden">
-                    A
+                    S
                 </div>
             </div>
         </div>

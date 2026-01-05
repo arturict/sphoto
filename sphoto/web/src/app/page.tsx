@@ -58,7 +58,8 @@ const plans: Plan[] = [
     price: '5',
     storage: '200 GB',
     description: 'Für Einzelpersonen — genug für Jahre Fotos.',
-    highlights: ['KI-Suche (Gesichter & Objekte)', 'Schneller Upload', 'Prioritäts-Support'],
+    highlights: ['KI-Suche (Gesichter & Objekte)', "Server in Europa 🇪🇺",
+      'Prioritäts-Support'],
     cta: 'Basic wählen',
     variant: 'outline',
   },
@@ -79,12 +80,12 @@ const featureRows = [
   {
     icon: Shield,
     title: 'Privatsphäre zuerst',
-    description: 'Kein Tracking, keine Werbung. Die Galerie gehört dir — nicht einem Werbenetzwerk.',
+    description: "Verschlüsselt gespeichert in der EU. Kein Tracking, keine Werbung. Die Galerie gehört dir — nicht einem Werbenetzwerk.",
   },
   {
     icon: Cloud,
-    title: 'Schweizer Hosting',
-    description: 'Datenhaltung in der Schweiz. Du entscheidest, was du speicherst und wie lange.',
+    title: 'EU Hosting',
+    description: 'Datenhaltung in der EU. Du entscheidest, was du speicherst und wie lange.',
   },
   {
     icon: Smartphone,
@@ -111,7 +112,7 @@ const featureRows = [
 const faqs = [
   {
     q: 'Was ist SPhoto?',
-    a: 'SPhoto ist eine private Foto-Cloud in der Schweiz, basierend auf Immich. Sie bietet automatische Backups, eine schnelle Web-Galerie und KI-Suche — ohne Tracking.',
+    a: 'SPhoto ist eine private Foto-Cloud in Europa, basierend auf Immich. Sie bietet automatische Backups, eine schnelle Web-Galerie und KI-Suche — ohne Tracking.',
   },
   {
     q: 'Kann ich von Google Photos oder iCloud wechseln?',
@@ -123,17 +124,17 @@ const faqs = [
   },
   {
     q: 'Kann ich monatlich kündigen?',
-    a: 'Ja. Du kannst jederzeit kündigen. Deine Daten bleiben für eine begrenzte Zeit verfügbar, damit du sie exportieren kannst.',
+    a: "Jede Instanz läuft isoliert mit eigenen Containern und Datenbanken. Deine Daten werden ausschliesslich in Europa gespeichert.",
   },
 ]
 
 function isEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)
 }
 
 export default function Home() {
   const [email, setEmail] = useState('')
-  const validEmail = useMemo(() => (email ? isEmail(email) : false), [email])
+  const validEmail = useMemo(() => isEmail(email), [email])
 
   const handleCheckout = (planId: Plan['id']) => {
     if (!validEmail) return
@@ -183,7 +184,7 @@ export default function Home() {
             <div className="mx-auto max-w-3xl text-center">
               <Badge variant="secondary" className="mb-8 border-primary/20 bg-primary/5 text-primary">
                 <Shield className="mr-1.5 h-3 w-3" />
-                Privatsphäre + Schweizer Hosting
+                Privatsphäre + EU Hosting
               </Badge>
 
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl text-balance leading-[1.1]">
@@ -194,7 +195,8 @@ export default function Home() {
 
               <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance leading-relaxed">
                 SPhoto ist die private Alternative zu Google Photos: automatische Backups, KI-Suche und Sharing.
-                Gehostet in der Schweiz — ohne Tracking.
+                Gehostet in Europa 🇪🇺
+                — ohne Tracking.
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -330,7 +332,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-3">
                     <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    Schweizer Hosting
+                    EU Hosting
                   </div>
                   <div className="flex items-center gap-3">
                     <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
@@ -514,7 +516,7 @@ export default function Home() {
                 <Cloud className="h-3.5 w-3.5 text-background" />
               </div>
               <span className="font-semibold">SPhoto</span>
-              <span className="text-sm text-muted-foreground">· Schweiz</span>
+              <span className="text-sm text-muted-foreground">· Europa</span>
             </div>
 
             <nav className="flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
@@ -540,7 +542,7 @@ export default function Home() {
               </Link>
             </nav>
 
-            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} SPhoto</p>
+            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} SPhoto · 🇪🇺</p>
           </div>
         </div>
       </footer>

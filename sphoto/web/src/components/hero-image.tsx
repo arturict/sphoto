@@ -7,19 +7,19 @@ import { ImmichTopBar } from "./immich-topbar"
 export function HeroImage() {
   // Generate random data for the dense grid
   const gridRows = [
-    { label: "Today", count: 8 },
-    { label: "Yesterday", count: 12 },
+    { label: "Today", count: 9 },
+    { label: "Yesterday", count: 18 },
     { label: "Wednesday", count: 18 },
   ]
 
   return (
-    <div className="relative w-full max-w-[1200px] mx-auto mt-16 lg:mt-24 perspective-[2000px]">
+    <div className="relative w-full max-w-[1200px] mx-auto mt-8 lg:mt-12 perspective-[2000px]">
       {/* Abstract Browser Interface */}
       <motion.div
-        initial={{ opacity: 0, rotateX: 20, y: 100 }}
+        initial={{ opacity: 0, rotateX: 10, y: 40 }}
         animate={{ opacity: 1, rotateX: 0, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="relative rounded-2xl border border-white/10 bg-black shadow-2xl overflow-hidden ring-1 ring-white/10 flex h-[700px]"
+        transition={{ duration: 1.2, ease: "easeOut" }}
+        className="relative rounded-2xl border border-white/10 bg-black shadow-2xl overflow-hidden ring-1 ring-white/10 flex h-[600px]"
       >
         <ImmichSidebar />
 
@@ -36,7 +36,7 @@ export function HeroImage() {
                   <div className={`absolute inset-0 bg-white/5 animate-pulse`} />
                   {/* Simulated Images */}
                   <img
-                    src={`https://images.unsplash.com/photo-${1500000000000 + i * 10000}?auto=format&fit=crop&w=600&q=80`}
+                    src={`https://picsum.photos/seed/${i * 123}/600/400`}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
                     alt="memory"
                   />
@@ -65,7 +65,7 @@ export function HeroImage() {
                       className="aspect-square bg-white/5 rounded-[2px] overflow-hidden relative group cursor-pointer"
                     >
                       <img
-                        src={`https://images.unsplash.com/photo-${1510000000000 + (rowIndex * 20 + i) * 123456}?auto=format&fit=crop&w=200&q=80`}
+                        src={`https://picsum.photos/seed/${(rowIndex * 50) + i}/200/200`}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 opacity-80"
                         alt="gallery"
                       />

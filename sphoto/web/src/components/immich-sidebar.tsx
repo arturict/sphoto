@@ -41,7 +41,7 @@ export function ImmichSidebar() {
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" /></svg>
                     </div>
                 </div>
-                <span className="text-white text-sm font-bold tracking-tight">immich</span>
+                <span className="text-white text-sm font-bold tracking-tight">SPhoto</span>
             </div>
 
             <nav className="flex-1 px-2 space-y-0.5">
@@ -75,7 +75,7 @@ export function ImmichSidebar() {
                         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-500 w-3/4" />
                         </div>
-                        <span className="text-white/40">3.4 TiB of 4.5 TiB used</span>
+                        <span className="text-white/40">1.2 TB of 2 TB used</span>
                     </div>
                 </div>
             </div>
