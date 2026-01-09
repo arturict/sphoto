@@ -12,9 +12,27 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
+  Clock,
   Cloud,
   Crown,
   DollarSign,
@@ -25,6 +43,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MoreVertical,
   RefreshCcw,
   RefreshCw,
   Search,
@@ -165,7 +184,7 @@ export default function SharedAdminPage() {
   const [instances, setInstances] = useState<SharedInstances | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{ userId: string; type: "soft" | "purge" } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [lastSync, setLastSync] = useState<Date | null>(null)
@@ -341,12 +360,18 @@ export default function SharedAdminPage() {
     setLastSync(null)
   }
 
-  const handleDeleteUser = async (userId: string, force: boolean = false) => {
+  const handleDeleteUser = async (userId: string, type: "soft" | "force" | "purge") => {
     setActionLoading(userId)
     try {
-      await api(`/api/shared/users/${userId}${force ? "/force" : ""}`, "DELETE")
-      setDeleteConfirm(null)
-      await loadData({ silent: true })
+      const endpoint = type === "soft" 
+        ? `/api/shared/users/${userId}` 
+        : type === "force"
+        ? `/api/shared/users/${userId}/force`
+        : `/api/shared/users/${userId}/purge`
+      await api(endpoint, "DELETE")
+      setDeleteDialog(null)
+      setSuccess(type === "purge" ? "User wurde vollständig gelöscht" : "User wurde gelöscht")
+      await loadData({ silent: true, withStats: true })
     } catch {
       // already handled
     } finally {
@@ -1050,40 +1075,40 @@ export default function SharedAdminPage() {
                                 <TrendingUp className="h-4 w-4" />
                               </a>
                             )}
-                            {deleteConfirm === user.visibleId ? (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleDeleteUser(user.visibleId, true)}
-                                  disabled={actionLoading === user.visibleId}
-                                  className="cursor-pointer"
-                                >
-                                  {actionLoading === user.visibleId ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    "Confirm"
-                                  )}
-                                </Button>
+                            {/* Delete Actions Dropdown */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => setDeleteConfirm(null)}
                                   className="cursor-pointer"
+                                  disabled={actionLoading === user.visibleId}
                                 >
-                                  Cancel
+                                  {actionLoading === user.visibleId ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <MoreVertical className="h-4 w-4" />
+                                  )}
                                 </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeleteConfirm(user.visibleId)}
-                                className="text-destructive hover:text-destructive cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="cursor-pointer text-amber-600"
+                                  onClick={() => setDeleteDialog({ userId: user.visibleId, type: "soft" })}
+                                >
+                                  <Clock className="h-4 w-4 mr-2" />
+                                  Löschen (14 Tage)
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="cursor-pointer text-destructive"
+                                  onClick={() => setDeleteDialog({ userId: user.visibleId, type: "purge" })}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Definitiv löschen
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
@@ -1094,6 +1119,51 @@ export default function SharedAdminPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {deleteDialog?.type === "soft" ? "User löschen?" : "User definitiv löschen?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  {deleteDialog?.type === "soft" ? (
+                    <>
+                      <p>Der User wird zur Löschung vorgemerkt und nach 14 Tagen endgültig gelöscht.</p>
+                      <p className="text-muted-foreground">
+                        Der User kann sich in dieser Zeit noch anmelden und die Löschung abbrechen.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-destructive">
+                        WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!
+                      </p>
+                      <p>Der User wird sofort und vollständig gelöscht:</p>
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        <li>Immich-Account wird gelöscht</li>
+                        <li>Alle Fotos und Videos werden unwiderruflich entfernt</li>
+                        <li>Stripe-Subscription wird gekündigt (falls vorhanden)</li>
+                        <li>Lokale Daten werden entfernt</li>
+                      </ul>
+                    </>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="cursor-pointer">Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteDialog && handleDeleteUser(deleteDialog.userId, deleteDialog.type === "soft" ? "soft" : "purge")}
+                className={`cursor-pointer ${deleteDialog?.type === "purge" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}`}
+              >
+                {deleteDialog?.type === "soft" ? "Löschen (14 Tage)" : "Definitiv löschen"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   )

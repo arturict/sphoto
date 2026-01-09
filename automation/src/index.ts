@@ -518,6 +518,133 @@ app.post('/portal/upgrade', portalAuth, async (req: Request, res: Response) => {
 });
 
 // =============================================================================
+// Portal Export API
+// =============================================================================
+import { startSharedUserExport, getSharedExportJob, getLatestExportForUser } from './export';
+
+// Request a new export
+app.post('/portal/request-export', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  
+  // Check if user can request export (once per month)
+  if (user.lastExportAt) {
+    const lastExport = new Date(user.lastExportAt);
+    const daysSinceExport = (Date.now() - lastExport.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceExport < 30) {
+      return res.status(429).json({ 
+        error: 'Du kannst nur einmal pro Monat einen Export anfordern.',
+        nextExportAvailable: new Date(lastExport.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+    }
+  }
+  
+  // Check for already running export
+  const existingJob = getLatestExportForUser(user.visibleId);
+  if (existingJob && (existingJob.status === 'pending' || existingJob.status === 'processing')) {
+    return res.json({ 
+      success: true,
+      jobId: existingJob.id,
+      status: existingJob.status,
+      message: 'Export läuft bereits',
+    });
+  }
+  
+  try {
+    // Start export
+    const job = await startSharedUserExport(
+      user.visibleId,
+      user.email,
+      user.instance,
+      user.immichUserId
+    );
+    
+    // Update lastExportAt
+    const { writeFileSync, readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const USERS_DIR = join(INSTANCES_DIR, '_shared_users');
+    const userFilePath = join(USERS_DIR, `${user.visibleId}.json`);
+    const userData = JSON.parse(readFileSync(userFilePath, 'utf-8'));
+    userData.lastExportAt = new Date().toISOString();
+    writeFileSync(userFilePath, JSON.stringify(userData, null, 2));
+    
+    res.json({
+      success: true,
+      jobId: job.id,
+      status: job.status,
+      message: 'Export gestartet. Du erhältst eine E-Mail, sobald der Download bereit ist.',
+    });
+  } catch (err) {
+    console.error('Export request error:', err);
+    res.status(500).json({ error: 'Export konnte nicht gestartet werden' });
+  }
+});
+
+// Get export status
+app.get('/portal/export/:jobId', portalAuth, (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  const job = getSharedExportJob(req.params.jobId);
+  
+  if (!job || job.visibleId !== user.visibleId) {
+    return res.status(404).json({ error: 'Export nicht gefunden' });
+  }
+  
+  const downloadUrl = job.downloadToken 
+    ? `https://api.${env.DOMAIN}/api/exports/${job.downloadToken}`
+    : undefined;
+  
+  res.json({
+    id: job.id,
+    status: job.status,
+    created: job.created,
+    completed: job.completed,
+    expiresAt: job.expiresAt,
+    fileSize: job.fileSize,
+    totalAssets: job.totalAssets,
+    downloadedAssets: job.downloadedAssets,
+    downloadUrl,
+    error: job.error,
+  });
+});
+
+// Get latest export for current user
+app.get('/portal/export', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  const job = getLatestExportForUser(user.visibleId);
+  
+  if (!job) {
+    return res.json({ hasExport: false });
+  }
+  
+  const downloadUrl = job.downloadToken 
+    ? `https://api.${env.DOMAIN}/api/exports/${job.downloadToken}`
+    : undefined;
+  
+  // Send email notification if just completed and not yet notified
+  if (job.status === 'completed' && downloadUrl && !job.notified) {
+    try {
+      await sendExportReadyEmail(user.email, user.visibleId, downloadUrl, job.fileSize || 0);
+      (job as any).notified = true;
+    } catch (err) {
+      console.error('Failed to send export email:', err);
+    }
+  }
+  
+  res.json({
+    hasExport: true,
+    id: job.id,
+    status: job.status,
+    created: job.created,
+    completed: job.completed,
+    expiresAt: job.expiresAt,
+    fileSize: job.fileSize,
+    totalAssets: job.totalAssets,
+    downloadedAssets: job.downloadedAssets,
+    downloadUrl,
+    error: job.error,
+  });
+});
+
+// =============================================================================
 // Subdomain API
 // =============================================================================
 app.get('/subdomain/check/:subdomain', (req: Request, res: Response) => {
@@ -1039,6 +1166,37 @@ app.delete('/api/shared/users/:id/force', adminAuth, async (req: Request, res: R
       return res.status(400).json({ error: result.error });
     }
     res.json({ success: true, message: 'User deleted immediately' });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Admin: Purge user completely (delete from Immich AND remove local record)
+app.delete('/api/shared/users/:id/purge', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    // First cancel any Stripe subscription if exists
+    const user = getSharedUser(req.params.id);
+    if (user?.stripeSubscriptionId) {
+      const stripe = getStripe();
+      if (stripe) {
+        try {
+          await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+          console.log(`Cancelled Stripe subscription for ${user.email}`);
+        } catch (err) {
+          console.error(`Failed to cancel Stripe subscription: ${(err as Error).message}`);
+        }
+      }
+    }
+
+    const result = await purgeSharedUser(req.params.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, message: 'User purged completely' });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

@@ -72,6 +72,20 @@ interface PortalData {
   lastExportAt?: string
 }
 
+interface ExportJob {
+  hasExport: boolean
+  id?: string
+  status?: "pending" | "processing" | "completed" | "failed"
+  created?: string
+  completed?: string
+  expiresAt?: string
+  fileSize?: number
+  totalAssets?: number
+  downloadedAssets?: number
+  downloadUrl?: string
+  error?: string
+}
+
 // Helper function to format relative time
 function formatMemberSince(dateString: string): string {
   const date = new Date(dateString)
@@ -103,6 +117,15 @@ function formatDate(dateString: string): string {
   })
 }
 
+// Format file size
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+}
+
 export default function PortalPage() {
   return (
     <Suspense fallback={
@@ -127,6 +150,7 @@ function PortalContent() {
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [exportJob, setExportJob] = useState<ExportJob | null>(null)
 
   const fetchDashboard = useCallback(async (authToken: string) => {
     try {
@@ -155,6 +179,20 @@ function PortalContent() {
     }
   }, [])
 
+  const fetchExportStatus = useCallback(async (authToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/portal/export`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (res.ok) {
+        const exportData = await res.json()
+        setExportJob(exportData)
+      }
+    } catch {
+      // Silently ignore export status errors
+    }
+  }, [])
+
   const validateToken = useCallback(async (urlToken: string) => {
     try {
       const res = await fetch(`${API_URL}/portal/auth`, {
@@ -177,11 +215,12 @@ function PortalContent() {
       router.replace("/portal")
       
       fetchDashboard(result.token)
+      fetchExportStatus(result.token)
     } catch {
       setError("Login konnte nicht validiert werden")
       setLoading(false)
     }
-  }, [router, fetchDashboard])
+  }, [router, fetchDashboard, fetchExportStatus])
 
   // Check for token in URL (magic link) or localStorage
   useEffect(() => {
@@ -193,11 +232,24 @@ function PortalContent() {
       if (storedToken) {
         setToken(storedToken)
         fetchDashboard(storedToken)
+        fetchExportStatus(storedToken)
       } else {
         setLoading(false)
       }
     }
-  }, [searchParams, validateToken, fetchDashboard])
+  }, [searchParams, validateToken, fetchDashboard, fetchExportStatus])
+
+  // Poll export status while processing
+  useEffect(() => {
+    if (!token || !exportJob?.hasExport) return
+    if (exportJob.status !== "pending" && exportJob.status !== "processing") return
+    
+    const interval = setInterval(() => {
+      fetchExportStatus(token)
+    }, 3000) // Poll every 3 seconds
+    
+    return () => clearInterval(interval)
+  }, [token, exportJob?.hasExport, exportJob?.status, fetchExportStatus])
 
   async function handleLogout() {
     if (!token) return
@@ -337,9 +389,9 @@ function PortalContent() {
       
       if (result.success) {
         fetchDashboard(token)
+        fetchExportStatus(token)
         setError(null)
-        // Show success in a simple way
-        alert("Export angefordert! Du erhältst eine E-Mail mit dem Download-Link.")
+        setSuccessMessage("Export gestartet! Du erhältst eine E-Mail mit dem Download-Link.")
       } else {
         setError(result.error || "Export konnte nicht angefordert werden")
       }
@@ -813,7 +865,60 @@ function PortalContent() {
                 Alle Fotos und Videos herunterladen
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Show current export status if there's an active job */}
+              {exportJob?.hasExport && exportJob.status && (
+                <div className={`p-3 rounded-lg ${
+                  exportJob.status === "completed" ? "bg-success/10 border border-success/20" :
+                  exportJob.status === "failed" ? "bg-destructive/10 border border-destructive/20" :
+                  "bg-primary/10 border border-primary/20"
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {exportJob.status === "completed" ? (
+                      <CheckCircle className="h-4 w-4 text-success" />
+                    ) : exportJob.status === "failed" ? (
+                      <XCircle className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {exportJob.status === "pending" && "Export wird vorbereitet..."}
+                      {exportJob.status === "processing" && `Export läuft (${exportJob.downloadedAssets || 0}/${exportJob.totalAssets || "?"} Dateien)...`}
+                      {exportJob.status === "completed" && "Export bereit!"}
+                      {exportJob.status === "failed" && "Export fehlgeschlagen"}
+                    </span>
+                  </div>
+                  
+                  {exportJob.status === "processing" && exportJob.totalAssets && exportJob.totalAssets > 0 && (
+                    <Progress 
+                      value={((exportJob.downloadedAssets || 0) / exportJob.totalAssets) * 100} 
+                      className="h-2"
+                    />
+                  )}
+                  
+                  {exportJob.status === "completed" && exportJob.downloadUrl && (
+                    <div className="mt-2 space-y-2">
+                      <Button asChild className="w-full cursor-pointer" size="sm">
+                        <a href={exportJob.downloadUrl} download>
+                          <Download className="h-4 w-4 mr-2" />
+                          Herunterladen ({exportJob.fileSize ? formatFileSize(exportJob.fileSize) : "ZIP"})
+                        </a>
+                      </Button>
+                      {exportJob.expiresAt && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          Link gültig bis {formatDate(exportJob.expiresAt)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {exportJob.status === "failed" && exportJob.error && (
+                    <p className="text-xs text-destructive mt-1">{exportJob.error}</p>
+                  )}
+                </div>
+              )}
+              
+              {/* Info text */}
               {data.canRequestExport ? (
                 <p className="text-sm text-muted-foreground">
                   Du kannst einmal pro Monat einen Export anfordern. Der Download-Link wird dir per E-Mail zugeschickt.
@@ -834,12 +939,14 @@ function PortalContent() {
             <CardFooter>
               <Button 
                 variant="outline" 
-                disabled={!data.canRequestExport || actionLoading === "export"} 
+                disabled={!data.canRequestExport || actionLoading === "export" || (exportJob?.status === "pending" || exportJob?.status === "processing")} 
                 className="w-full cursor-pointer"
                 onClick={handleRequestExport}
               >
                 {actionLoading === "export" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (exportJob?.status === "pending" || exportJob?.status === "processing") ? (
+                  "Export läuft..."
                 ) : (
                   "Export anfordern"
                 )}
