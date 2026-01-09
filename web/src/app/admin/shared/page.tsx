@@ -653,7 +653,7 @@ export default function SharedAdminPage() {
                   </thead>
                   <tbody>
                     {sortedUsers.map((user) => (
-                      <tr key={user.id} className="border-b hover:bg-muted/50 transition-colors">
+                      <tr key={user.visibleId} className="border-b hover:bg-muted/50 transition-colors">
                         <td className="py-3 px-2">
                           <div>
                             <span className="font-medium">{user.email}</span>
@@ -693,16 +693,16 @@ export default function SharedAdminPage() {
                                 <TrendingUp className="h-4 w-4" />
                               </a>
                             )}
-                            {deleteConfirm === user.id ? (
+                            {deleteConfirm === user.visibleId ? (
                               <div className="flex items-center gap-1">
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => handleDeleteUser(user.id, true)}
-                                  disabled={actionLoading === user.id}
+                                  onClick={() => handleDeleteUser(user.visibleId, true)}
+                                  disabled={actionLoading === user.visibleId}
                                   className="cursor-pointer"
                                 >
-                                  {actionLoading === user.id ? (
+                                  {actionLoading === user.visibleId ? (
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                   ) : (
                                     "Confirm"
@@ -721,7 +721,7 @@ export default function SharedAdminPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => setDeleteConfirm(user.id)}
+                                onClick={() => setDeleteConfirm(user.visibleId)}
                                 className="text-destructive hover:text-destructive cursor-pointer"
                               >
                                 <Trash2 className="h-4 w-4" />

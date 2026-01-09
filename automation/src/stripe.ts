@@ -49,10 +49,42 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   console.log(`Event: ${event.type} (Mode: ${DEPLOYMENT_MODE})`);
 
   try {
-    if (DEPLOYMENT_MODE === 'shared') {
-      await handleWebhookShared(stripe, event, res);
-    } else {
+    // Determine if this event is for a siloed instance (Nextcloud or old siloed Immich)
+    let useSiloedMode = false;
+    
+    if (event.type === 'checkout.session.completed') {
+      // For checkout events, check the session metadata
+      const session = event.data.object as Stripe.Checkout.Session;
+      const platform = session.metadata?.platform as Platform | undefined;
+      
+      if (platform === 'nextcloud') {
+        console.log('Nextcloud checkout detected - using siloed mode');
+        useSiloedMode = true;
+      }
+    } else if (['invoice.payment_failed', 'customer.subscription.deleted', 'customer.subscription.updated'].includes(event.type)) {
+      // For subscription events, check the customer metadata
+      let customerId: string | undefined;
+      
+      if (event.type === 'invoice.payment_failed') {
+        customerId = (event.data.object as Stripe.Invoice).customer as string;
+      } else {
+        customerId = (event.data.object as Stripe.Subscription).customer as string;
+      }
+      
+      if (customerId) {
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!('deleted' in customer) && customer.metadata?.deployment_mode === 'siloed') {
+          console.log('Siloed instance event detected - using siloed mode');
+          useSiloedMode = true;
+        }
+      }
+    }
+    
+    // Route to appropriate handler
+    if (useSiloedMode || DEPLOYMENT_MODE === 'siloed') {
       await handleWebhookSiloed(stripe, event, res);
+    } else {
+      await handleWebhookShared(stripe, event, res);
     }
   } catch (err) {
     console.error('Webhook handler error:', err);
