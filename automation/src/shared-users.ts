@@ -62,7 +62,7 @@ function tierToQuotaGB(tier: UserTier, planStorageGB?: number): number {
 // Immich API Helpers
 // =============================================================================
 
-async function immichApiCall<T>(
+export async function immichApiCall<T>(
   instance: 'free' | 'paid',
   endpoint: string,
   options: RequestInit = {}
@@ -781,3 +781,282 @@ export async function getPortalData(visibleId: string): Promise<{
     },
   };
 }
+
+// =============================================================================
+// Sync with Immich Instances
+// =============================================================================
+
+interface ImmichUser {
+  id: string;
+  email: string;
+  name: string;
+  isAdmin: boolean;
+  quotaSizeInBytes: number | null;
+  quotaUsageInBytes: number | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export async function syncWithImmich(): Promise<{
+  success: boolean;
+  synced: {
+    free: { total: number; tracked: number; untracked: number; orphaned: number };
+    paid: { total: number; tracked: number; untracked: number; orphaned: number };
+  };
+  untrackedUsers: Array<{ email: string; instance: 'free' | 'paid'; immichUserId: string }>;
+  orphanedRecords: string[];
+  error?: string;
+}> {
+  const localUsers = listSharedUsers();
+  const orphanedRecords: string[] = [];
+  const untrackedUsers: Array<{ email: string; instance: 'free' | 'paid'; immichUserId: string }> = [];
+
+  const synced = {
+    free: { total: 0, tracked: 0, untracked: 0, orphaned: 0 },
+    paid: { total: 0, tracked: 0, untracked: 0, orphaned: 0 },
+  };
+
+  // Fetch users from both instances
+  for (const instance of ['free', 'paid'] as const) {
+    const result = await immichApiCall<ImmichUser[]>(instance, '/api/admin/users');
+    
+    if (!result.ok || !result.data) {
+      return { 
+        success: false, 
+        synced, 
+        untrackedUsers, 
+        orphanedRecords,
+        error: `Failed to fetch users from ${instance}: ${result.error}` 
+      };
+    }
+
+    // Filter out admin users (we don't track those)
+    const immichUsers = result.data.filter(u => !u.isAdmin && !u.deletedAt);
+    synced[instance].total = immichUsers.length;
+
+    // Check which Immich users are tracked locally
+    for (const immichUser of immichUsers) {
+      const localUser = localUsers.find(
+        u => u.immichUserId === immichUser.id && u.instance === instance
+      );
+      
+      if (localUser) {
+        synced[instance].tracked++;
+      } else {
+        synced[instance].untracked++;
+        untrackedUsers.push({
+          email: immichUser.email,
+          instance,
+          immichUserId: immichUser.id,
+        });
+      }
+    }
+
+    // Check for orphaned local records (no matching Immich user)
+    const instanceLocalUsers = localUsers.filter(u => u.instance === instance && u.status !== 'deleted');
+    for (const localUser of instanceLocalUsers) {
+      const immichUser = immichUsers.find(u => u.id === localUser.immichUserId);
+      if (!immichUser) {
+        synced[instance].orphaned++;
+        orphanedRecords.push(localUser.visibleId);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    synced,
+    untrackedUsers,
+    orphanedRecords,
+  };
+}
+
+export async function importUntrackedUser(
+  instance: 'free' | 'paid',
+  immichUserId: string,
+  tier: UserTier
+): Promise<{ success: boolean; user?: SharedUser; error?: string }> {
+  // Fetch user details from Immich
+  const result = await immichApiCall<ImmichUser>(instance, `/api/admin/users/${immichUserId}`);
+  
+  if (!result.ok || !result.data) {
+    return { success: false, error: `Failed to fetch user: ${result.error}` };
+  }
+
+  const immichUser = result.data;
+  const quotaGB = immichUser.quotaSizeInBytes 
+    ? Math.round(immichUser.quotaSizeInBytes / (1024 * 1024 * 1024))
+    : tierToQuotaGB(tier);
+
+  const user: SharedUser = {
+    id: crypto.randomUUID(),
+    visibleId: generateVisibleId(immichUser.email),
+    email: immichUser.email,
+    immichUserId: immichUser.id,
+    tier,
+    instance,
+    quotaGB,
+    created: immichUser.createdAt,
+    status: 'active',
+  };
+
+  writeFileSync(getUserFilePath(user.visibleId), JSON.stringify(user, null, 2));
+  console.log(`Imported untracked user ${user.email} from ${instance}`);
+
+  return { success: true, user };
+}
+
+export async function cleanupOrphanedRecords(visibleIds: string[]): Promise<{
+  success: boolean;
+  cleaned: string[];
+  errors: string[];
+}> {
+  const cleaned: string[] = [];
+  const errors: string[] = [];
+
+  for (const visibleId of visibleIds) {
+    const filePath = getUserFilePath(visibleId);
+    if (existsSync(filePath)) {
+      try {
+        const { unlinkSync } = await import('fs');
+        unlinkSync(filePath);
+        cleaned.push(visibleId);
+        console.log(`Cleaned up orphaned record: ${visibleId}`);
+      } catch (err) {
+        errors.push(`${visibleId}: ${(err as Error).message}`);
+      }
+    }
+  }
+
+  return { success: errors.length === 0, cleaned, errors };
+}
+
+// =============================================================================
+// Enhanced User Stats
+// =============================================================================
+
+export async function getEnhancedUserStats(visibleId: string): Promise<{
+  success: boolean;
+  stats?: {
+    quotaGB: number;
+    usedBytes: number;
+    usedGB: number;
+    percentUsed: number;
+    photos: number;
+    videos: number;
+    lastActivity?: string;
+    createdAt: string;
+    averageFileSize?: number;
+  };
+  error?: string;
+}> {
+  const user = getSharedUser(visibleId);
+  if (!user) return { success: false, error: 'User not found' };
+
+  // Get user statistics
+  const statsResult = await immichApiCall<{
+    images: number;
+    videos: number;
+    usage: number;
+  }>(user.instance, `/api/admin/users/${user.immichUserId}/statistics`);
+
+  // Get user details for last activity
+  const userResult = await immichApiCall<ImmichUser>(
+    user.instance,
+    `/api/admin/users/${user.immichUserId}`
+  );
+
+  if (!statsResult.ok || !statsResult.data) {
+    return { success: false, error: statsResult.error };
+  }
+
+  const quotaBytes = user.quotaGB * 1024 * 1024 * 1024;
+  const usedBytes = statsResult.data.usage;
+  const totalFiles = statsResult.data.images + statsResult.data.videos;
+
+  return {
+    success: true,
+    stats: {
+      quotaGB: user.quotaGB,
+      usedBytes,
+      usedGB: Math.round(usedBytes / (1024 * 1024 * 1024) * 100) / 100,
+      percentUsed: Math.round((usedBytes / quotaBytes) * 100),
+      photos: statsResult.data.images,
+      videos: statsResult.data.videos,
+      lastActivity: userResult.data?.updatedAt,
+      createdAt: user.created,
+      averageFileSize: totalFiles > 0 ? Math.round(usedBytes / totalFiles) : 0,
+    },
+  };
+}
+
+// =============================================================================
+// Bulk User Stats
+// =============================================================================
+
+export async function getAllUsersWithStats(): Promise<{
+  success: boolean;
+  users: Array<SharedUser & {
+    stats?: {
+      usedBytes: number;
+      photos: number;
+      videos: number;
+      lastActivity?: string;
+    };
+    syncStatus: 'synced' | 'orphaned' | 'unknown';
+  }>;
+  error?: string;
+}> {
+  const localUsers = listSharedUsers().filter(u => u.status !== 'deleted');
+  const usersWithStats: Array<SharedUser & {
+    stats?: { usedBytes: number; photos: number; videos: number; lastActivity?: string };
+    syncStatus: 'synced' | 'orphaned' | 'unknown';
+  }> = [];
+
+  // Fetch all Immich users to check sync status
+  const freeUsersResult = await immichApiCall<ImmichUser[]>('free', '/api/admin/users');
+  const paidUsersResult = await immichApiCall<ImmichUser[]>('paid', '/api/admin/users');
+
+  const freeImmichIds = new Set(freeUsersResult.data?.map(u => u.id) || []);
+  const paidImmichIds = new Set(paidUsersResult.data?.map(u => u.id) || []);
+
+  for (const user of localUsers) {
+    const immichIds = user.instance === 'free' ? freeImmichIds : paidImmichIds;
+    const syncStatus = immichIds.has(user.immichUserId) ? 'synced' : 'orphaned';
+
+    // Try to get stats (only if synced)
+    let stats: { usedBytes: number; photos: number; videos: number; lastActivity?: string } | undefined;
+    
+    if (syncStatus === 'synced') {
+      const statsResult = await immichApiCall<{
+        images: number;
+        videos: number;
+        usage: number;
+      }>(user.instance, `/api/admin/users/${user.immichUserId}/statistics`);
+
+      if (statsResult.ok && statsResult.data) {
+        const userResult = await immichApiCall<ImmichUser>(
+          user.instance,
+          `/api/admin/users/${user.immichUserId}`
+        );
+
+        stats = {
+          usedBytes: statsResult.data.usage,
+          photos: statsResult.data.images,
+          videos: statsResult.data.videos,
+          lastActivity: userResult.data?.updatedAt,
+        };
+      }
+    }
+
+    usersWithStats.push({
+      ...user,
+      stats,
+      syncStatus,
+    });
+  }
+
+  return { success: true, users: usersWithStats };
+}
+

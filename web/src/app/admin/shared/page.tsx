@@ -12,18 +12,20 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
-  Activity,
   AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
   Cloud,
   Crown,
+  DollarSign,
   ExternalLink,
   Filter,
   HardDrive,
+  ImageIcon,
   Loader2,
   LogOut,
   Mail,
+  RefreshCcw,
   RefreshCw,
   Search,
   Server,
@@ -33,12 +35,12 @@ import {
   TrendingUp,
   User,
   Users,
+  Video,
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "localhost"
 
 type UserTier = "free" | "basic" | "pro"
 
@@ -55,6 +57,14 @@ interface SharedUser {
   deletionScheduledFor?: string
   stripeCustomerId?: string
   stripeSubscriptionId?: string
+  // Enhanced stats
+  stats?: {
+    usedBytes: number
+    photos: number
+    videos: number
+    lastActivity?: string
+  }
+  syncStatus?: "synced" | "orphaned" | "unknown"
 }
 
 interface SharedInstanceStats {
@@ -81,6 +91,29 @@ interface SharedInstances {
       stats: SharedInstanceStats | null
     }
   }
+}
+
+interface RevenueData {
+  mrr: number
+  mrrFormatted: string
+  activeSubscriptions: number
+  totalCustomers: number
+  recentRevenue: number
+  recentRevenueFormatted: string
+  newSignups30d: number
+  churn30d: number
+  churnRate: string
+}
+
+interface SyncResult {
+  success: boolean
+  synced: {
+    free: { total: number; tracked: number; untracked: number; orphaned: number }
+    paid: { total: number; tracked: number; untracked: number; orphaned: number }
+  }
+  untrackedUsers: Array<{ email: string; instance: "free" | "paid"; immichUserId: string }>
+  orphanedRecords: string[]
+  error?: string
 }
 
 type TierFilter = "all" | UserTier
@@ -134,8 +167,13 @@ export default function SharedAdminPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [lastSync, setLastSync] = useState<Date | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefresh] = useState(true)
+  const [revenue, setRevenue] = useState<RevenueData | null>(null)
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [showSyncPanel, setShowSyncPanel] = useState(false)
+  const [showRevenuePanel, setShowRevenuePanel] = useState(false)
   const [filters, setFilters] = useState<{
     query: string
     tier: TierFilter
@@ -161,13 +199,17 @@ export default function SharedAdminPage() {
   }, [])
 
   const api = useCallback(
-    async (endpoint: string, method: "GET" | "POST" | "DELETE" = "GET") => {
+    async (endpoint: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown) => {
       if (!apiKey) throw new Error("No API key set")
       setError(null)
       try {
         const res = await fetch(`${API_URL}${endpoint}`, {
           method,
-          headers: { "x-api-key": apiKey },
+          headers: {
+            "x-api-key": apiKey,
+            ...(body ? { "Content-Type": "application/json" } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
         })
 
         if (res.status === 401) {
@@ -197,12 +239,14 @@ export default function SharedAdminPage() {
   )
 
   const loadData = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; withStats?: boolean }) => {
       if (!apiKey) return
       if (!options?.silent) setLoading(true)
       try {
+        // Use stats endpoint for enhanced data if requested
+        const endpoint = options?.withStats ? "/api/shared/users/stats" : "/api/shared/users"
         const [usersData, instancesData] = await Promise.all([
-          api("/api/shared/users"),
+          api(endpoint),
           api("/api/shared/instances"),
         ])
         if (Array.isArray(usersData)) setUsers(usersData)
@@ -217,9 +261,64 @@ export default function SharedAdminPage() {
     [api, apiKey]
   )
 
+  const loadRevenue = useCallback(async () => {
+    try {
+      const data = await api("/api/admin/revenue")
+      if (data) setRevenue(data)
+    } catch {
+      // error already set
+    }
+  }, [api])
+
+  const handleSync = useCallback(async () => {
+    setActionLoading("sync")
+    try {
+      const result = await api("/api/shared/sync")
+      if (result) {
+        setSyncResult(result)
+        setShowSyncPanel(true)
+      }
+    } catch {
+      // error already set
+    } finally {
+      setActionLoading(null)
+    }
+  }, [api])
+
+  const handleImportUser = async (instance: "free" | "paid", immichUserId: string, email: string) => {
+    setActionLoading(`import-${immichUserId}`)
+    try {
+      // Determine tier based on instance
+      const tier = instance === "free" ? "free" : "basic"
+      await api("/api/shared/sync/import", "POST", { instance, immichUserId, tier })
+      setSuccess(`User ${email} imported successfully`)
+      await loadData({ withStats: true })
+      await handleSync()
+    } catch {
+      // error already set
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSendLoginEmail = async (userId: string) => {
+    setActionLoading(`email-${userId}`)
+    try {
+      await api(`/api/shared/users/${userId}/send-login`, "POST")
+      setSuccess("Login email sent successfully")
+    } catch {
+      // error already set
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   useEffect(() => {
-    if (isAuthed) loadData()
-  }, [isAuthed, loadData])
+    if (isAuthed) {
+      loadData({ withStats: true })
+      loadRevenue()
+    }
+  }, [isAuthed, loadData, loadRevenue])
 
   useEffect(() => {
     if (!autoRefresh || !isAuthed) return
@@ -301,7 +400,6 @@ export default function SharedAdminPage() {
   const freeCount = users.filter((u) => u.tier === "free").length
   const basicCount = users.filter((u) => u.tier === "basic").length
   const proCount = users.filter((u) => u.tier === "pro").length
-  const activeCount = users.filter((u) => u.status === "active").length
   const totalQuota = users.reduce((sum, u) => sum + u.quotaGB, 0)
 
   if (!isAuthed) {
@@ -518,6 +616,221 @@ export default function SharedAdminPage() {
           </Card>
         </div>
 
+        {/* Action Buttons Row */}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowRevenuePanel(!showRevenuePanel)
+              if (!revenue) loadRevenue()
+            }}
+            className="cursor-pointer"
+          >
+            <DollarSign className="mr-2 h-4 w-4" />
+            Revenue
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleSync}
+            disabled={actionLoading === "sync"}
+            className="cursor-pointer"
+          >
+            {actionLoading === "sync" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCcw className="mr-2 h-4 w-4" />
+            )}
+            Sync with Immich
+          </Button>
+        </div>
+
+        {/* Success Message */}
+        {success && (
+          <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 dark:text-green-400 text-sm flex items-center justify-between">
+            <span>{success}</span>
+            <Button variant="ghost" size="sm" onClick={() => setSuccess(null)} className="cursor-pointer h-6 w-6 p-0">
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Revenue Panel */}
+        {showRevenuePanel && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Revenue Dashboard
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowRevenuePanel(false)} className="cursor-pointer">
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {revenue ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Monthly Recurring Revenue</p>
+                    <p className="text-2xl font-bold text-green-600">{revenue.mrrFormatted}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Active Subscriptions</p>
+                    <p className="text-2xl font-bold">{revenue.activeSubscriptions}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Last 30 Days Revenue</p>
+                    <p className="text-2xl font-bold">{revenue.recentRevenueFormatted}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">New Signups (30d)</p>
+                    <p className="text-2xl font-bold">{revenue.newSignups30d}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Churn (30d)</p>
+                    <p className="text-2xl font-bold">{revenue.churn30d}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Churn Rate</p>
+                    <p className="text-2xl font-bold">{revenue.churnRate}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sync Panel */}
+        {showSyncPanel && syncResult && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <RefreshCcw className="h-5 w-5" />
+                  Sync Results
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowSyncPanel(false)} className="cursor-pointer">
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Summary */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="p-4 rounded-lg border">
+                  <h4 className="font-medium mb-2">Free Instance</h4>
+                  <div className="text-sm space-y-1">
+                    <p>Total in Immich: <span className="font-medium">{syncResult.synced.free.total}</span></p>
+                    <p>Tracked locally: <span className="font-medium text-green-600">{syncResult.synced.free.tracked}</span></p>
+                    <p>Untracked: <span className="font-medium text-amber-600">{syncResult.synced.free.untracked}</span></p>
+                    <p>Orphaned records: <span className="font-medium text-red-600">{syncResult.synced.free.orphaned}</span></p>
+                  </div>
+                </div>
+                <div className="p-4 rounded-lg border">
+                  <h4 className="font-medium mb-2">Paid Instance</h4>
+                  <div className="text-sm space-y-1">
+                    <p>Total in Immich: <span className="font-medium">{syncResult.synced.paid.total}</span></p>
+                    <p>Tracked locally: <span className="font-medium text-green-600">{syncResult.synced.paid.tracked}</span></p>
+                    <p>Untracked: <span className="font-medium text-amber-600">{syncResult.synced.paid.untracked}</span></p>
+                    <p>Orphaned records: <span className="font-medium text-red-600">{syncResult.synced.paid.orphaned}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Untracked Users */}
+              {syncResult.untrackedUsers.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Untracked Users ({syncResult.untrackedUsers.length})
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    These users exist in Immich but are not tracked locally. Import them to enable management.
+                  </p>
+                  <div className="space-y-2">
+                    {syncResult.untrackedUsers.map((u) => (
+                      <div key={u.immichUserId} className="flex items-center justify-between p-3 rounded-lg border bg-amber-500/5">
+                        <div>
+                          <span className="font-medium">{u.email}</span>
+                          <Badge variant="outline" className="ml-2">{u.instance}</Badge>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleImportUser(u.instance, u.immichUserId, u.email)}
+                          disabled={actionLoading === `import-${u.immichUserId}`}
+                          className="cursor-pointer"
+                        >
+                          {actionLoading === `import-${u.immichUserId}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Import"
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Orphaned Records */}
+              {syncResult.orphanedRecords.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Orphaned Records ({syncResult.orphanedRecords.length})
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    These local records have no matching user in Immich. They can be safely cleaned up.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {syncResult.orphanedRecords.map((id) => (
+                      <Badge key={id} variant="destructive">{id}</Badge>
+                    ))}
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={async () => {
+                      setActionLoading("cleanup")
+                      try {
+                        await api("/api/shared/sync/cleanup", "POST", { visibleIds: syncResult.orphanedRecords })
+                        setSuccess("Orphaned records cleaned up")
+                        await handleSync()
+                      } catch {
+                        // error already set
+                      } finally {
+                        setActionLoading(null)
+                      }
+                    }}
+                    disabled={actionLoading === "cleanup"}
+                    className="cursor-pointer"
+                  >
+                    {actionLoading === "cleanup" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Clean Up All
+                  </Button>
+                </div>
+              )}
+
+              {/* All synced message */}
+              {syncResult.untrackedUsers.length === 0 && syncResult.orphanedRecords.length === 0 && (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span>All users are synced! No issues found.</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filters */}
         <Card>
           <CardHeader className="pb-4">
@@ -634,10 +947,11 @@ export default function SharedAdminPage() {
                         onClick={() => handleSort("quotaGB")}
                       >
                         <span className="flex items-center gap-1">
-                          Quota
+                          Storage
                           <ArrowUpDown className="h-3 w-3" />
                         </span>
                       </th>
+                      <th className="text-left py-3 px-2 font-medium text-muted-foreground">Media</th>
                       <th className="text-left py-3 px-2 font-medium text-muted-foreground">Status</th>
                       <th
                         className="text-left py-3 px-2 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
@@ -667,9 +981,37 @@ export default function SharedAdminPage() {
                           </Badge>
                         </td>
                         <td className="py-3 px-2">
-                          <Badge variant="outline">{user.instance}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline">{user.instance}</Badge>
+                            {user.syncStatus === "orphaned" && (
+                              <span title="Orphaned - no matching Immich user">
+                                <AlertTriangle className="h-3 w-3 text-red-500" />
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-3 px-2">{user.quotaGB} GB</td>
+                        <td className="py-3 px-2">
+                          <div>
+                            <span>{user.stats ? formatBytes(user.stats.usedBytes) : "—"}</span>
+                            <span className="text-muted-foreground"> / {user.quotaGB} GB</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          {user.stats ? (
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                              <span className="flex items-center gap-1" title="Photos">
+                                <ImageIcon className="h-3 w-3" />
+                                {user.stats.photos}
+                              </span>
+                              <span className="flex items-center gap-1" title="Videos">
+                                <Video className="h-3 w-3" />
+                                {user.stats.videos}
+                              </span>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="py-3 px-2">
                           <Badge className={statusColors[user.status]}>
                             {user.status === "active"
@@ -682,6 +1024,21 @@ export default function SharedAdminPage() {
                         <td className="py-3 px-2 text-muted-foreground">{formatDate(user.created)}</td>
                         <td className="py-3 px-2 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Send Login Email */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSendLoginEmail(user.visibleId)}
+                              disabled={actionLoading === `email-${user.visibleId}`}
+                              className="cursor-pointer"
+                              title="Send login email"
+                            >
+                              {actionLoading === `email-${user.visibleId}` ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
                             {user.stripeCustomerId && (
                               <a
                                 href={`https://dashboard.stripe.com/test/customers/${user.stripeCustomerId}`}

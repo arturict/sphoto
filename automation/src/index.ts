@@ -33,6 +33,11 @@ import {
   validatePortalToken,
   invalidatePortalToken,
   getPortalData,
+  syncWithImmich,
+  importUntrackedUser,
+  cleanupOrphanedRecords,
+  getEnhancedUserStats,
+  getAllUsersWithStats,
 } from './shared-users';
 import { 
   getAlertHistory, 
@@ -939,6 +944,237 @@ app.delete('/api/shared/users/:id/force', adminAuth, async (req: Request, res: R
       return res.status(400).json({ error: result.error });
     }
     res.json({ success: true, message: 'User deleted immediately' });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Sync & Enhanced Stats API (Admin)
+// =============================================================================
+
+// Sync with Immich instances - check for untracked users and orphaned records
+app.get('/api/shared/sync', adminAuth, async (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await syncWithImmich();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Import an untracked user from Immich
+app.post('/api/shared/sync/import', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { instance, immichUserId, tier } = req.body;
+
+  if (!['free', 'paid'].includes(instance)) {
+    return res.status(400).json({ error: 'Instance must be "free" or "paid"' });
+  }
+
+  if (!immichUserId) {
+    return res.status(400).json({ error: 'immichUserId is required' });
+  }
+
+  const validTiers: UserTier[] = ['free', 'basic', 'pro'];
+  if (!validTiers.includes(tier)) {
+    return res.status(400).json({ error: 'tier must be "free", "basic", or "pro"' });
+  }
+
+  try {
+    const result = await importUntrackedUser(instance, immichUserId, tier);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, user: result.user });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Cleanup orphaned records (local files with no matching Immich user)
+app.post('/api/shared/sync/cleanup', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const { visibleIds } = req.body;
+
+  if (!Array.isArray(visibleIds)) {
+    return res.status(400).json({ error: 'visibleIds must be an array' });
+  }
+
+  try {
+    const result = await cleanupOrphanedRecords(visibleIds);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get enhanced stats for a single user
+app.get('/api/shared/users/:id/stats/enhanced', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await getEnhancedUserStats(req.params.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.stats);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get all users with stats (for admin dashboard)
+app.get('/api/shared/users/stats', adminAuth, async (_req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  try {
+    const result = await getAllUsersWithStats();
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.users);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// =============================================================================
+// Admin Email & Revenue API
+// =============================================================================
+
+import { sendPortalLoginEmail } from './email';
+
+// Send portal login email to a user (re-send access link)
+app.post('/api/shared/users/:id/send-login', adminAuth, async (req: Request, res: Response) => {
+  if (DEPLOYMENT_MODE !== 'shared') {
+    return res.status(400).json({ error: 'Only available in shared deployment mode' });
+  }
+
+  const user = getSharedUser(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  try {
+    const session = createPortalSession(user.visibleId);
+    if (!session.success || !session.token) {
+      return res.status(500).json({ error: 'Failed to create portal session' });
+    }
+    
+    await sendPortalLoginEmail(user.email, session.token);
+    res.json({ success: true, message: `Login email sent to ${user.email}` });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get Stripe revenue dashboard data
+app.get('/api/admin/revenue', adminAuth, async (_req: Request, res: Response) => {
+  const stripe = getStripe();
+  if (!stripe) {
+    return res.status(400).json({ error: 'Stripe not configured' });
+  }
+
+  try {
+    // Get all active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      status: 'active',
+      limit: 100,
+      expand: ['data.customer'],
+    });
+
+    // Calculate MRR
+    let mrr = 0;
+    const subscriptionDetails: Array<{
+      customerId: string;
+      customerEmail: string;
+      planName: string;
+      amount: number;
+      currency: string;
+      created: number;
+      currentPeriodEnd: number;
+    }> = [];
+
+    for (const sub of subscriptions.data) {
+      const monthlyAmount = sub.items.data.reduce((sum, item) => {
+        const price = item.price;
+        if (price.recurring?.interval === 'month') {
+          return sum + (price.unit_amount || 0);
+        } else if (price.recurring?.interval === 'year') {
+          return sum + Math.round((price.unit_amount || 0) / 12);
+        }
+        return sum;
+      }, 0);
+      
+      mrr += monthlyAmount;
+      
+      const customer = sub.customer as { email?: string; id: string };
+      subscriptionDetails.push({
+        customerId: customer.id,
+        customerEmail: customer.email || 'unknown',
+        planName: sub.items.data[0]?.price?.nickname || 'Unknown Plan',
+        amount: monthlyAmount / 100,
+        currency: sub.currency,
+        created: sub.created,
+        currentPeriodEnd: sub.current_period_end,
+      });
+    }
+
+    // Get recent charges for revenue tracking
+    const charges = await stripe.charges.list({
+      limit: 100,
+      created: {
+        gte: Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60, // Last 30 days
+      },
+    });
+
+    const recentRevenue = charges.data
+      .filter(c => c.status === 'succeeded')
+      .reduce((sum, c) => sum + c.amount, 0);
+
+    // Get customer count
+    const customers = await stripe.customers.list({ limit: 1 });
+
+    // Get recent signups (subscriptions created in last 30 days)
+    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+    const newSubscriptions = subscriptions.data.filter(s => s.created >= thirtyDaysAgo);
+
+    // Get canceled subscriptions (churned)
+    const canceledSubs = await stripe.subscriptions.list({
+      status: 'canceled',
+      limit: 100,
+      created: { gte: thirtyDaysAgo },
+    });
+
+    res.json({
+      mrr: mrr / 100,
+      mrrFormatted: `CHF ${(mrr / 100).toFixed(2)}`,
+      activeSubscriptions: subscriptions.data.length,
+      totalCustomers: customers.data.length,
+      recentRevenue: recentRevenue / 100,
+      recentRevenueFormatted: `CHF ${(recentRevenue / 100).toFixed(2)}`,
+      newSignups30d: newSubscriptions.length,
+      churn30d: canceledSubs.data.length,
+      churnRate: subscriptions.data.length > 0 
+        ? ((canceledSubs.data.length / subscriptions.data.length) * 100).toFixed(1) + '%'
+        : '0%',
+      subscriptions: subscriptionDetails,
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
