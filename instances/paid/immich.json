@@ -1,0 +1,39 @@
+{
+  "server": {
+    "externalDomain": "",
+    "loginPageMessage": "<div style=\"text-align: center; padding: 16px 0;\"><div style=\"font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px;\">SPhoto Pro</div><div style=\"font-size: 14px; color: #64748b;\">Ihre Fotos - Sicher in der Schweiz</div><div style=\"margin-top: 12px;\"><a href=\"https://sphoto.ferreiracruz.com/portal\" style=\"color: #8b5cf6; text-decoration: underline; font-size: 13px;\">Mein Konto verwalten</a></div></div>",
+    "publicUsers": true
+  },
+  "theme": {
+    "customCss": ":root { --immich-primary: #8b5cf6; } .immich-title { visibility: hidden; position: relative; } .immich-title::after { content: 'SPhoto'; visibility: visible; position: absolute; left: 0; font-weight: 700; } header .logo { filter: hue-rotate(240deg) saturate(1.2); } .login-card { border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); } body { font-family: system-ui, -apple-system, sans-serif; }"
+  },
+  "machineLearning": {
+    "enabled": true,
+    "urls": ["http://sphoto-ml:3003"],
+    "clip": {
+      "enabled": true,
+      "modelName": "ViT-B-32__openai"
+    },
+    "facialRecognition": {
+      "enabled": true,
+      "modelName": "buffalo_l",
+      "minScore": 0.7,
+      "maxDistance": 0.5,
+      "minFaces": 3
+    },
+    "duplicateDetection": {
+      "enabled": true,
+      "maxDistance": 0.01
+    }
+  },
+  "trash": {
+    "enabled": true,
+    "days": 30
+  },
+  "passwordLogin": {
+    "enabled": true
+  },
+  "newVersionCheck": {
+    "enabled": false
+  }
+}

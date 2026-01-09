@@ -16,8 +16,11 @@ services:
       - REDIS_HOSTNAME=redis
       # No ML - leave empty to disable
       - MACHINE_LEARNING_URL=
+      # Use config file for branding
+      - IMMICH_CONFIG_FILE=/config/immich.json
     volumes:
       - ${UPLOAD_LOCATION:-./uploads}:/usr/src/app/upload
+      - ./immich.json:/config/immich.json:ro
     depends_on:
       - db
       - redis

@@ -16,8 +16,11 @@ services:
       - REDIS_HOSTNAME=redis
       # Use shared ML service for efficiency
       - MACHINE_LEARNING_URL=http://sphoto-ml:3003
+      # Use config file for branding
+      - IMMICH_CONFIG_FILE=/config/immich.json
     volumes:
       - ${UPLOAD_LOCATION:-./uploads}:/usr/src/app/upload
+      - ./immich.json:/config/immich.json:ro
     depends_on:
       - db
       - redis
