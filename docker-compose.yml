@@ -10,7 +10,7 @@ services:
   # Traefik - Reverse Proxy & Auto-SSL
   # ===========================================================================
   traefik:
-    image: traefik:v3.2
+    image: traefik:v2.11
     container_name: sphoto-traefik
     command:
       - "--api.dashboard=true"
@@ -26,8 +26,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      - DOCKER_API_VERSION=1.44
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-certs:/letsencrypt
