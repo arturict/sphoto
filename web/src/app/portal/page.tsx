@@ -126,6 +126,7 @@ function PortalContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const fetchDashboard = useCallback(async (authToken: string) => {
     try {
@@ -235,6 +236,40 @@ function PortalContent() {
       }
     } catch {
       setError("Billing Portal konnte nicht geöffnet werden")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleUpgrade(plan: 'basic' | 'pro') {
+    if (!token) return
+    setActionLoading(`upgrade-${plan}`)
+    setError(null)
+    
+    try {
+      const res = await fetch(`${API_URL}/portal/upgrade`, {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan }),
+      })
+      
+      const result = await res.json()
+      
+      if (result.url) {
+        // Redirect to Stripe checkout
+        window.location.href = result.url
+      } else if (result.success) {
+        // Instant upgrade (Basic -> Pro)
+        setSuccessMessage(result.message || "Upgrade erfolgreich!")
+        fetchDashboard(token)
+      } else {
+        setError(result.error || "Upgrade fehlgeschlagen")
+      }
+    } catch {
+      setError("Upgrade konnte nicht durchgeführt werden")
     } finally {
       setActionLoading(null)
     }
@@ -406,6 +441,21 @@ function PortalContent() {
           </Card>
         )}
 
+        {/* Success Toast */}
+        {successMessage && (
+          <Card className="mb-6 border-success bg-success/5 animate-slide-up">
+            <CardContent className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-success" />
+                <p className="text-success text-sm font-medium">{successMessage}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setSuccessMessage(null)} className="cursor-pointer shrink-0" aria-label="Schliessen">
+                <X className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Error Toast */}
         {error && data && (
           <Card className="mb-6 border-destructive bg-destructive/5 animate-slide-up">
@@ -513,11 +563,36 @@ function PortalContent() {
                 </a>
               </Button>
               {data.tier === "free" ? (
-                <Button variant="outline" className="flex-1 h-11 cursor-pointer border-primary text-primary hover:bg-primary/5" asChild>
-                  <Link href="/#pricing">
-                    <Zap className="h-4 w-4 mr-2" />
-                    Jetzt upgraden
-                  </Link>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-11 cursor-pointer border-primary text-primary hover:bg-primary/5"
+                  onClick={() => handleUpgrade("basic")}
+                  disabled={actionLoading?.startsWith("upgrade")}
+                >
+                  {actionLoading === "upgrade-basic" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Jetzt upgraden
+                    </>
+                  )}
+                </Button>
+              ) : data.tier === "basic" ? (
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-11 cursor-pointer border-primary text-primary hover:bg-primary/5"
+                  onClick={() => handleUpgrade("pro")}
+                  disabled={actionLoading?.startsWith("upgrade")}
+                >
+                  {actionLoading === "upgrade-pro" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Auf Pro upgraden
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button 
@@ -590,7 +665,7 @@ function PortalContent() {
           {data.tier === "free" && (
             <Card className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-primary/5 via-primary/10 to-purple-500/10 border-primary/20 card-hover animate-slide-up delay-200">
               <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
                     <Zap className="h-7 w-7 text-primary" />
                   </div>
@@ -601,25 +676,126 @@ function PortalContent() {
                       und unterstütze die Weiterentwicklung von SPhoto.
                     </p>
                   </div>
-                  <Button className="btn-cta h-11 px-6 cursor-pointer shrink-0" asChild>
-                    <Link href="/#pricing">
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      Pläne ansehen
-                    </Link>
+                </div>
+                
+                {/* Plan Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Basic Plan */}
+                  <div className="p-4 rounded-xl bg-background/80 border">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-semibold">Basic</h4>
+                        <p className="text-2xl font-bold">CHF 5<span className="text-sm font-normal text-muted-foreground">/Mt.</span></p>
+                      </div>
+                      <Camera className="h-8 w-8 text-primary/50" />
+                    </div>
+                    <ul className="space-y-2 text-sm mb-4">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        200 GB Speicher
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        KI-Features
+                      </li>
+                    </ul>
+                    <Button 
+                      className="w-full cursor-pointer" 
+                      onClick={() => handleUpgrade("basic")}
+                      disabled={actionLoading?.startsWith("upgrade")}
+                    >
+                      {actionLoading === "upgrade-basic" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Basic wählen"
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Pro Plan */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">Pro</h4>
+                          <Badge className="bg-primary/20 text-primary text-xs">Beliebt</Badge>
+                        </div>
+                        <p className="text-2xl font-bold">CHF 15<span className="text-sm font-normal text-muted-foreground">/Mt.</span></p>
+                      </div>
+                      <Sparkles className="h-8 w-8 text-primary" />
+                    </div>
+                    <ul className="space-y-2 text-sm mb-4">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        1 TB Speicher
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        Alle KI-Features
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        Prioritäts-Support
+                      </li>
+                    </ul>
+                    <Button 
+                      className="w-full btn-cta cursor-pointer" 
+                      onClick={() => handleUpgrade("pro")}
+                      disabled={actionLoading?.startsWith("upgrade")}
+                    >
+                      {actionLoading === "upgrade-pro" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Pro wählen"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Upgrade Prompt for Basic Users */}
+          {data.tier === "basic" && (
+            <Card className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-purple-500/5 via-purple-500/10 to-primary/10 border-purple-500/20 card-hover animate-slide-up delay-200">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-500/10">
+                    <Sparkles className="h-7 w-7 text-purple-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">Upgrade auf Pro</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Erweitere auf 1 TB Speicher und erhalte Prioritäts-Support für nur CHF 10 mehr pro Monat.
+                    </p>
+                  </div>
+                  <Button 
+                    className="btn-cta h-11 px-6 cursor-pointer shrink-0" 
+                    onClick={() => handleUpgrade("pro")}
+                    disabled={actionLoading?.startsWith("upgrade")}
+                  >
+                    {actionLoading === "upgrade-pro" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Auf Pro upgraden
+                      </>
+                    )}
                   </Button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
                   <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                    <span>200 GB - 1 TB Speicher</span>
+                    <CheckCircle2 className="h-4 w-4 text-purple-500 shrink-0" />
+                    <span>1 TB statt 200 GB</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                    <span>KI-Gesichtserkennung</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-purple-500 shrink-0" />
                     <span>Prioritäts-Support</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-purple-500 shrink-0" />
+                    <span>Sofortige Aktivierung</span>
                   </div>
                 </div>
               </CardContent>

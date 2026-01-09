@@ -422,6 +422,101 @@ app.post('/portal/logout', portalAuth, (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// Upgrade to paid plan
+app.post('/portal/upgrade', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  const { plan } = req.body; // 'basic' or 'pro'
+  
+  // Validate plan
+  if (!plan || !['basic', 'pro'].includes(plan)) {
+    return res.status(400).json({ error: 'Invalid plan. Must be "basic" or "pro".' });
+  }
+  
+  // Check if upgrade is valid
+  if (user.tier === 'pro') {
+    return res.status(400).json({ error: 'Already on Pro plan' });
+  }
+  
+  if (user.tier === 'basic' && plan === 'basic') {
+    return res.status(400).json({ error: 'Already on Basic plan' });
+  }
+  
+  if (user.tier === 'free' && plan === 'basic') {
+    // Free -> Basic: Create new checkout session
+    try {
+      const url = await createCheckoutSession('basic', undefined, 'immich', user.email);
+      return res.json({ url });
+    } catch (err) {
+      console.error('Checkout error:', err);
+      return res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+  }
+  
+  if (user.tier === 'free' && plan === 'pro') {
+    // Free -> Pro: Create new checkout session
+    try {
+      const url = await createCheckoutSession('pro', undefined, 'immich', user.email);
+      return res.json({ url });
+    } catch (err) {
+      console.error('Checkout error:', err);
+      return res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+  }
+  
+  if (user.tier === 'basic' && plan === 'pro') {
+    // Basic -> Pro: Use Stripe to upgrade existing subscription
+    const stripe = getStripe();
+    if (!stripe) {
+      return res.status(501).json({ error: 'Stripe not configured' });
+    }
+    
+    if (!user.stripeSubscriptionId) {
+      // No existing subscription, create new checkout
+      try {
+        const url = await createCheckoutSession('pro', undefined, 'immich', user.email);
+        return res.json({ url });
+      } catch (err) {
+        console.error('Checkout error:', err);
+        return res.status(500).json({ error: 'Failed to create checkout session' });
+      }
+    }
+    
+    try {
+      // Get current subscription
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      const subscriptionItemId = subscription.items.data[0]?.id;
+      
+      if (!subscriptionItemId) {
+        return res.status(500).json({ error: 'Could not find subscription item' });
+      }
+      
+      // Upgrade subscription with proration
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        items: [{
+          id: subscriptionItemId,
+          price: env.STRIPE_PRICE_PRO,
+        }],
+        proration_behavior: 'create_prorations',
+      });
+      
+      // Import and use the migration function to update local data
+      const { updateSharedUserTier } = await import('./shared-users');
+      await updateSharedUserTier(user.visibleId, 'pro', 1000);
+      
+      return res.json({ 
+        success: true, 
+        message: 'Upgrade to Pro successful!',
+        newPlan: 'pro',
+      });
+    } catch (err) {
+      console.error('Stripe upgrade error:', err);
+      return res.status(500).json({ error: 'Failed to upgrade subscription' });
+    }
+  }
+  
+  return res.status(400).json({ error: 'Invalid upgrade path' });
+});
+
 // =============================================================================
 // Subdomain API
 // =============================================================================
