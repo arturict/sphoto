@@ -120,7 +120,11 @@ services:
   # Web App (Landing + Admin Dashboard)
   # ===========================================================================
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}
+        - NEXT_PUBLIC_DOMAIN=${DOMAIN}
     container_name: sphoto-web
     environment:
       - NEXT_PUBLIC_API_URL=https://api.${DOMAIN}

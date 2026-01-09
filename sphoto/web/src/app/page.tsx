@@ -4,17 +4,20 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
   ArrowRight,
+  Calendar,
+  Camera,
   Check,
   CheckCircle,
   ChevronDown,
   Cloud,
+  FileText,
+  FolderSync,
   HardDrive,
-  Lock,
   Mail,
   Search,
   Shield,
   Smartphone,
-  Upload,
+  Sparkles,
   Users,
   XCircle,
 } from 'lucide-react'
@@ -25,9 +28,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { HeroImage } from '@/components/hero-image'
 import { GridPattern } from '@/components/ui/background-pattern'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.sphoto.arturf.ch'
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'sphoto.arturf.ch'
+
+type Platform = 'immich' | 'nextcloud'
 
 type Plan = {
   id: 'free' | 'basic' | 'pro'
@@ -39,6 +45,7 @@ type Plan = {
   cta: string
   popular?: boolean
   variant: 'secondary' | 'outline' | 'default'
+  immichOnly?: boolean
 }
 
 const plans: Plan[] = [
@@ -47,20 +54,20 @@ const plans: Plan[] = [
     name: 'Free',
     price: '0',
     storage: '5 GB',
-    description: 'Zum Testen und für kleine Libraries.',
-    highlights: ['Mobile Apps', 'Automatische Backups', 'Web-Galerie'],
-    cta: 'Kostenlos starten',
+    description: 'For testing and small libraries.',
+    highlights: ['Mobile apps', 'Automatic backups', 'Web gallery'],
+    cta: 'Start for free',
     variant: 'secondary',
+    immichOnly: true,
   },
   {
     id: 'basic',
     name: 'Basic',
     price: '5',
     storage: '200 GB',
-    description: 'Für Einzelpersonen — genug für Jahre Fotos.',
-    highlights: ['KI-Suche (Gesichter & Objekte)', "Server in Europa 🇪🇺",
-      'Prioritäts-Support'],
-    cta: 'Basic wählen',
+    description: 'For individuals — enough for years of photos.',
+    highlights: ['AI search (faces & objects)', 'EU servers', 'Priority support'],
+    cta: 'Choose Basic',
     variant: 'outline',
   },
   {
@@ -68,63 +75,115 @@ const plans: Plan[] = [
     name: 'Pro',
     price: '15',
     storage: '1 TB',
-    description: 'Für Familien — teilen ohne Chaos.',
-    highlights: ['Mehrere Nutzer', 'Geteilte Alben', 'Alles aus Basic'],
-    cta: 'Pro wählen',
+    description: 'For families — share without chaos.',
+    highlights: ['Multiple users', 'Shared albums', 'Everything in Basic'],
+    cta: 'Choose Pro',
     popular: true,
     variant: 'default',
   },
 ]
 
-const featureRows = [
+const immichFeatures = [
   {
     icon: Shield,
-    title: 'Privatsphäre zuerst',
-    description: "Verschlüsselt gespeichert in der EU. Kein Tracking, keine Werbung. Die Galerie gehört dir — nicht einem Werbenetzwerk.",
+    title: 'Privacy first',
+    description: 'Encrypted storage in the EU. No tracking, no ads. Your gallery belongs to you — not an ad network.',
   },
   {
     icon: Cloud,
-    title: 'EU Hosting',
-    description: 'Datenhaltung in der EU. Du entscheidest, was du speicherst und wie lange.',
+    title: 'EU hosting',
+    description: 'Data stored in the EU. You decide what you store and for how long.',
   },
   {
     icon: Smartphone,
-    title: 'Automatische Backups',
-    description: 'iOS & Android Apps sichern im Hintergrund — ohne Frust und ohne manuelles Sortieren.',
+    title: 'Automatic backups',
+    description: 'iOS & Android apps back up in the background — no hassle, no manual sorting.',
   },
   {
     icon: Search,
-    title: 'KI-Suche',
-    description: 'Finde Fotos nach Gesichtern, Objekten oder Ort — in Sekunden statt Scrollen.',
+    title: 'AI search',
+    description: 'Find photos by faces, objects, or location — in seconds instead of scrolling.',
   },
   {
     icon: Users,
-    title: 'Familie & Sharing',
-    description: 'Mehrere Konten, geteilte Alben und gemeinsame Erinnerungen — ohne Passwort teilen.',
+    title: 'Family & sharing',
+    description: 'Multiple accounts, shared albums, and shared memories — without sharing passwords.',
   },
   {
     icon: HardDrive,
-    title: 'Daten mitnehmen',
-    description: 'Export jederzeit möglich. Keine Lock-in-Fallen, keine versteckten Hürden.',
+    title: 'Data portability',
+    description: 'Export anytime. No lock-in, no hidden barriers.',
   },
 ]
 
-const faqs = [
+const nextcloudFeatures = [
   {
-    q: 'Was ist SPhoto?',
-    a: 'SPhoto ist eine private Foto-Cloud in Europa, basierend auf Immich. Sie bietet automatische Backups, eine schnelle Web-Galerie und KI-Suche — ohne Tracking.',
+    icon: Shield,
+    title: 'Privacy first',
+    description: 'Your own cloud workspace in the EU. No tracking, no data mining. Full control over your files.',
   },
   {
-    q: 'Kann ich von Google Photos oder iCloud wechseln?',
-    a: 'Ja. Du kannst deine Daten exportieren (z.B. Google Takeout) und danach in SPhoto hochladen. Bei Bedarf helfen wir dir beim Umzug.',
+    icon: FolderSync,
+    title: 'File sync',
+    description: 'Sync files across all your devices. Desktop, mobile, and web — always in sync.',
   },
   {
-    q: 'Wie sicher sind meine Fotos?',
-    a: 'Der Zugriff ist per HTTPS abgesichert. Es gibt keine Werbung und kein Tracking. Zusätzlich kannst du deine Daten jederzeit exportieren und dein Konto löschen.',
+    icon: Calendar,
+    title: 'Calendar & contacts',
+    description: 'Built-in calendar and address book. Sync with your phone and desktop apps.',
   },
   {
-    q: 'Kann ich monatlich kündigen?',
-    a: "Jede Instanz läuft isoliert mit eigenen Containern und Datenbanken. Deine Daten werden ausschliesslich in Europa gespeichert.",
+    icon: FileText,
+    title: 'Office integration',
+    description: 'Edit documents, spreadsheets, and presentations directly in the browser.',
+  },
+  {
+    icon: Users,
+    title: 'Collaboration',
+    description: 'Share folders, comment on files, and work together in real-time.',
+  },
+  {
+    icon: HardDrive,
+    title: 'Data portability',
+    description: 'Export anytime. Your data, your rules — no vendor lock-in.',
+  },
+]
+
+const immichFaqs = [
+  {
+    q: 'What is SPhoto?',
+    a: 'SPhoto is a private photo cloud in Europe, powered by Immich. It offers automatic backups, a fast web gallery, and AI search — without tracking.',
+  },
+  {
+    q: 'Can I switch from Google Photos or iCloud?',
+    a: 'Yes. You can export your data (e.g., Google Takeout) and then upload it to SPhoto. We can help with the migration if needed.',
+  },
+  {
+    q: 'How secure are my photos?',
+    a: 'Access is secured via HTTPS. There are no ads and no tracking. You can export your data and delete your account at any time.',
+  },
+  {
+    q: 'Can I cancel monthly?',
+    a: 'Yes. All paid plans are billed monthly and can be cancelled anytime. Your data remains accessible until the end of the billing period.',
+  },
+]
+
+const nextcloudFaqs = [
+  {
+    q: 'What is SPhoto Nextcloud?',
+    a: 'SPhoto Nextcloud is your private cloud workspace in Europe. Store files, sync calendars, and collaborate — all without tracking or data mining.',
+  },
+  {
+    q: 'Can I switch from Dropbox or Google Drive?',
+    a: 'Yes. Simply upload your files to your new Nextcloud instance. The desktop app makes migration easy with drag-and-drop.',
+  },
+  {
+    q: 'What apps are included?',
+    a: 'Files, Calendar, Contacts, and Office (document editing). Desktop and mobile apps available for all platforms.',
+  },
+  {
+    q: 'Can I cancel monthly?',
+    a: 'Yes. All paid plans are billed monthly and can be cancelled anytime. Your data remains accessible until the end of the billing period.',
   },
 ]
 
@@ -134,7 +193,12 @@ function isEmail(value: string) {
 
 export default function Home() {
   const [email, setEmail] = useState('')
+  const [platform, setPlatform] = useState<Platform>('immich')
   const validEmail = useMemo(() => isEmail(email), [email])
+
+  const features = platform === 'immich' ? immichFeatures : nextcloudFeatures
+  const faqs = platform === 'immich' ? immichFaqs : nextcloudFaqs
+  const visiblePlans = platform === 'immich' ? plans : plans.filter(p => !p.immichOnly)
 
   const handleCheckout = (planId: Plan['id']) => {
     if (!validEmail) return
@@ -142,16 +206,17 @@ export default function Home() {
     const url =
       planId === 'free'
         ? `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
-        : `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}`
+        : `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}&platform=${platform}`
 
     window.location.href = url
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
+      {/* Floating Navbar */}
+      <header className="navbar-floating">
+        <div className="flex h-14 items-center justify-between px-6">
+          <Link href="/" className="flex items-center gap-2.5 font-heading font-semibold tracking-tight">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Cloud className="h-4 w-4" />
             </div>
@@ -159,97 +224,148 @@ export default function Home() {
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm">
             <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
-              Funktionen
+              Features
             </Link>
             <Link href="#how" className="text-muted-foreground hover:text-foreground transition-colors">
-              So funktionierts
+              How it works
             </Link>
             <Link href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-              Preise
+              Pricing
             </Link>
             <Link href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">
               FAQ
             </Link>
           </nav>
-          <Button asChild>
-            <a href="#pricing">Jetzt starten</a>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button asChild size="sm" className="hidden sm:inline-flex">
+              <a href="#pricing">Get started</a>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="relative">
-        <section className="relative pt-24 pb-24 md:pt-32 md:pb-32 overflow-hidden">
+      <main className="relative pt-24">
+        <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 overflow-hidden">
           <GridPattern />
           <div className="container px-4 md:px-6 relative z-10">
             <div className="mx-auto max-w-3xl text-center">
-              <Badge variant="secondary" className="mb-8 border-primary/20 bg-primary/5 text-primary">
-                <Shield className="mr-1.5 h-3 w-3" />
-                Privatsphäre + EU Hosting
+              {/* Platform Selector */}
+              <div className="mb-8 flex justify-center animate-fade-in">
+                <div className="inline-flex rounded-xl glass-strong p-1.5">
+                  <button
+                    onClick={() => setPlatform('immich')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                      platform === 'immich'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Camera className="h-4 w-4" />
+                    Immich Photos
+                  </button>
+                  <button
+                    onClick={() => setPlatform('nextcloud')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                      platform === 'nextcloud'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Cloud className="h-4 w-4" />
+                    Nextcloud Workspace
+                  </button>
+                </div>
+              </div>
+
+              <Badge variant="secondary" className="mb-8 border-primary/20 bg-primary/5 text-primary animate-fade-in">
+                <Sparkles className="mr-1.5 h-3 w-3" />
+                Privacy-first + EU Hosting
               </Badge>
 
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl text-balance leading-[1.1]">
-                Deine Fotos,
-                <br />
-                <span className="text-muted-foreground">ohne Datenhandel.</span>
+              <h1 className="font-heading text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl text-balance leading-[1.1] animate-slide-up">
+                {platform === 'immich' ? (
+                  <>
+                    Your photos,
+                    <br />
+                    <span className="text-muted-foreground">without data trading.</span>
+                  </>
+                ) : (
+                  <>
+                    Your workspace,
+                    <br />
+                    <span className="text-muted-foreground">fully private.</span>
+                  </>
+                )}
               </h1>
 
-              <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance leading-relaxed">
-                SPhoto ist die private Alternative zu Google Photos: automatische Backups, KI-Suche und Sharing.
-                Gehostet in Europa 🇪🇺
-                — ohne Tracking.
+              <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance leading-relaxed animate-slide-up delay-100">
+                {platform === 'immich' ? (
+                  <>
+                    SPhoto is the private alternative to Google Photos: automatic backups, AI search, and sharing.
+                    Hosted in Europe — without tracking.
+                  </>
+                ) : (
+                  <>
+                    SPhoto Nextcloud is your private workspace: file sync, calendar, contacts, and office apps.
+                    Hosted in Europe — without tracking.
+                  </>
+                )}
               </p>
 
-              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button size="lg" asChild className="h-12 px-8 text-base shadow-lg shadow-primary/20 transition-all hover:shadow-primary/40">
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up delay-200">
+                <Button size="lg" asChild className="h-12 px-8 text-base btn-cta">
                   <a href="#pricing">
-                    Kostenlos starten
+                    {platform === 'immich' ? 'Start for free' : 'Get started'}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" asChild className="h-12 px-8 text-base bg-background/50 backdrop-blur-sm">
-                  <a href="#features">Features ansehen</a>
+                <Button size="lg" variant="outline" asChild className="h-12 px-8 text-base glass">
+                  <a href="#features">See features</a>
                 </Button>
               </div>
 
-              <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground">
+              <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground animate-fade-in delay-300">
+                {platform === 'immich' && (
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-success" />
+                    No credit card for Free
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  Keine Kreditkarte für Free
+                  <Check className="h-4 w-4 text-success" />
+                  Cancel monthly
                 </div>
                 <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  Monatlich kündbar
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  Export jederzeit möglich
+                  <Check className="h-4 w-4 text-success" />
+                  Export anytime
                 </div>
               </div>
             </div>
 
-            <HeroImage />
-
-
+            {platform === 'immich' && <HeroImage />}
           </div>
         </section>
 
         <section id="features" className="py-24 md:py-32">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Alles, was du brauchst.</h2>
+              <h2 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">Everything you need.</h2>
               <p className="mt-4 text-muted-foreground text-balance text-lg">
-                Eine moderne Foto-Cloud, die sich nach Produkt anfühlt — nicht nach Kompromiss.
+                {platform === 'immich'
+                  ? 'A modern photo cloud that feels like a product — not a compromise.'
+                  : 'A complete workspace that respects your privacy — not your data.'}
               </p>
             </div>
 
             <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {featureRows.map((feature) => (
-                <Card key={feature.title} className="bg-card/50 card-hover border-border/50">
+              {features.map((feature) => (
+                <Card key={feature.title} className="bg-card/50 dark:bg-card/30 card-hover border-border/50 cursor-pointer">
                   <CardHeader className="p-6 pb-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary mb-4">
-                      <feature.icon className="h-5 w-5 text-foreground" />
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/20 mb-4">
+                      <feature.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-lg font-medium">{feature.title}</CardTitle>
+                    <CardTitle className="font-heading text-lg font-medium">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent className="px-6 pb-6 text-sm text-muted-foreground leading-relaxed">
                     {feature.description}
@@ -260,126 +376,107 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how" className="py-24 md:py-32 bg-secondary/30">
+        <section id="how" className="py-24 md:py-32 section-alt">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">So funktioniert&apos;s</h2>
+              <h2 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">How it works</h2>
               <p className="mt-4 text-muted-foreground text-balance text-lg">
-                In wenigen Minuten startklar — ohne kompliziertes Setup.
+                Ready in minutes — no complicated setup.
               </p>
             </div>
 
             <div className="mt-16 grid gap-6 md:grid-cols-3">
-              <Card className="bg-background border-border/50">
+              <Card className="bg-background border-border/50 card-hover cursor-pointer">
                 <CardHeader className="p-6 pb-4">
-                  <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background text-sm font-semibold mb-4">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-4">
                     1
                   </div>
-                  <CardTitle className="text-lg font-medium">Konto erstellen</CardTitle>
-                  <CardDescription>Mit deiner E-Mail</CardDescription>
+                  <CardTitle className="font-heading text-lg font-medium">Create account</CardTitle>
+                  <CardDescription>With your email</CardDescription>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 text-sm text-muted-foreground">
-                  Free starten oder direkt Basic/Pro wählen.
+                  {platform === 'immich'
+                    ? 'Start free or choose Basic/Pro directly.'
+                    : 'Choose Basic or Pro to get started.'}
                 </CardContent>
               </Card>
 
-              <Card className="bg-background border-border/50">
+              <Card className="bg-background border-border/50 card-hover cursor-pointer">
                 <CardHeader className="p-6 pb-4">
-                  <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background text-sm font-semibold mb-4">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-4">
                     2
                   </div>
-                  <CardTitle className="text-lg font-medium">Apps verbinden</CardTitle>
-                  <CardDescription>iOS und Android</CardDescription>
+                  <CardTitle className="font-heading text-lg font-medium">Connect apps</CardTitle>
+                  <CardDescription>
+                    {platform === 'immich' ? 'iOS and Android' : 'Desktop, iOS, and Android'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 text-sm text-muted-foreground">
-                  Backups laufen automatisch im Hintergrund.
+                  {platform === 'immich'
+                    ? 'Backups run automatically in the background.'
+                    : 'Sync files and calendars across all devices.'}
                 </CardContent>
               </Card>
 
-              <Card className="bg-background border-border/50">
+              <Card className="bg-background border-border/50 card-hover cursor-pointer">
                 <CardHeader className="p-6 pb-4">
-                  <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background text-sm font-semibold mb-4">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-4">
                     3
                   </div>
-                  <CardTitle className="text-lg font-medium">Suchen & teilen</CardTitle>
-                  <CardDescription>Mit KI und Alben</CardDescription>
+                  <CardTitle className="font-heading text-lg font-medium">
+                    {platform === 'immich' ? 'Search & share' : 'Work & collaborate'}
+                  </CardTitle>
+                  <CardDescription>
+                    {platform === 'immich' ? 'With AI and albums' : 'With your team or family'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 text-sm text-muted-foreground">
-                  Finde sofort und teile gezielt — ohne «alles öffentlich».
+                  {platform === 'immich'
+                    ? 'Find instantly and share selectively — without "everything public".'
+                    : 'Share folders, edit documents, and collaborate in real-time.'}
                 </CardContent>
               </Card>
             </div>
           </div>
         </section>
 
-        <section className="py-24 md:py-32">
+        <section id="pricing" className="py-24 md:py-32">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">SPhoto vs. Google Photos</h2>
-              <p className="mt-4 text-muted-foreground text-lg">Die Experience, die du willst — ohne das Geschäft dahinter.</p>
-            </div>
-
-            <div className="mt-16 grid gap-8 lg:grid-cols-2 max-w-4xl mx-auto">
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader className="p-6">
-                  <CardTitle className="text-lg font-medium">SPhoto</CardTitle>
-                  <CardDescription>Privat, fair, exportierbar</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 space-y-3 text-sm">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    Kein Tracking, keine Werbung
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    EU Hosting
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    Export jederzeit möglich
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    KI-Suche (Basic/Pro)
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-border/50">
-                <CardHeader className="p-6">
-                  <CardTitle className="text-lg font-medium">Google Photos</CardTitle>
-                  <CardDescription>Starkes Produkt, aber falsche Anreize</CardDescription>
-                </CardHeader>
-                <CardContent className="px-6 pb-6 space-y-3 text-sm">
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                    Tracking & Profiling als Geschäftsmodell
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                    Datenhaltung je nach Region
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                    Kündigung / Export oft mit Hürden
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="h-4 w-4 text-foreground flex-shrink-0" />
-                    Sehr gute Suche
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="py-24 md:py-32 bg-secondary/30">
-          <div className="container px-4 md:px-6">
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Preise</h2>
+              <h2 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">Pricing</h2>
               <p className="mt-4 text-muted-foreground text-balance text-lg">
-                Starte kostenlos. Upgraden, wenn du mehr Speicher oder Features brauchst.
+                {platform === 'immich'
+                  ? 'Start for free. Upgrade when you need more storage or features.'
+                  : 'Simple, transparent pricing. No hidden fees.'}
               </p>
+            </div>
+
+            {/* Platform Selector (repeated for pricing section) */}
+            <div className="mt-8 flex justify-center">
+              <div className="inline-flex rounded-xl glass-strong p-1.5">
+                <button
+                  onClick={() => setPlatform('immich')}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    platform === 'immich'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Camera className="h-4 w-4" />
+                  Immich Photos
+                </button>
+                <button
+                  onClick={() => setPlatform('nextcloud')}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    platform === 'nextcloud'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Cloud className="h-4 w-4" />
+                  Nextcloud Workspace
+                </button>
+              </div>
             </div>
 
             <div className="mt-12 max-w-md mx-auto">
@@ -387,7 +484,7 @@ export default function Home() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="email"
-                  placeholder="deine@email.ch"
+                  placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value.toLowerCase())}
                   className="pl-12 h-14 text-base bg-background"
@@ -395,7 +492,7 @@ export default function Home() {
                 {email && (
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
                     {validEmail ? (
-                      <CheckCircle className="h-5 w-5 text-foreground" />
+                      <CheckCircle className="h-5 w-5 text-success" />
                     ) : (
                       <XCircle className="h-5 w-5 text-destructive" />
                     )}
@@ -403,38 +500,38 @@ export default function Home() {
                 )}
               </div>
               {email && !validEmail && (
-                <p className="mt-3 text-sm text-destructive">Bitte gib eine gültige E-Mail-Adresse ein.</p>
+                <p className="mt-3 text-sm text-destructive">Please enter a valid email address.</p>
               )}
             </div>
 
-            <div className="mt-12 grid gap-6 lg:grid-cols-3 max-w-5xl mx-auto">
-              {plans.map((plan) => (
+            <div className={`mt-12 grid gap-6 max-w-5xl mx-auto ${visiblePlans.length === 2 ? 'lg:grid-cols-2 max-w-3xl' : 'lg:grid-cols-3'}`}>
+              {visiblePlans.map((plan) => (
                 <Card
                   key={plan.id}
-                  className={`relative bg-background ${plan.popular ? 'border-foreground shadow-lg' : 'border-border/50'}`}
+                  className={`relative bg-background card-hover ${plan.popular ? 'border-primary shadow-lg shadow-primary/10' : 'border-border/50'}`}
                 >
                   {plan.popular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge>Beliebt</Badge>
+                      <Badge className="bg-primary text-primary-foreground">Popular</Badge>
                     </div>
                   )}
                   <CardHeader className="p-6 text-center">
-                    <CardTitle className="text-lg font-medium">{plan.name}</CardTitle>
+                    <CardTitle className="font-heading text-lg font-medium">{plan.name}</CardTitle>
                     <CardDescription className="mt-1">{plan.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="px-6 pb-6 text-center">
                     <div className="mb-1">
-                      <span className="text-5xl font-semibold tracking-tight">{plan.price}</span>
-                      <span className="text-muted-foreground ml-1">CHF/Monat</span>
+                      <span className="font-heading text-5xl font-bold tracking-tight">{plan.price}</span>
+                      <span className="text-muted-foreground ml-1">CHF/month</span>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{plan.storage}</span> Speicher
+                      <span className="font-medium text-foreground">{plan.storage}</span> storage
                     </div>
 
                     <div className="mt-8 space-y-3 text-sm text-left">
                       {plan.highlights.map((h) => (
                         <div key={h} className="flex items-start gap-3">
-                          <Check className="h-4 w-4 text-foreground mt-0.5 flex-shrink-0" />
+                          <Check className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
                           <span>{h}</span>
                         </div>
                       ))}
@@ -442,12 +539,12 @@ export default function Home() {
                   </CardContent>
                   <CardFooter className="p-6 pt-0">
                     <Button
-                      className="w-full"
-                      variant={plan.variant}
+                      className={`w-full cursor-pointer ${plan.popular ? 'btn-cta' : ''}`}
+                      variant={plan.popular ? 'default' : plan.variant}
                       disabled={!validEmail}
                       onClick={() => handleCheckout(plan.id)}
                     >
-                      {!validEmail ? 'E-Mail eingeben' : plan.cta}
+                      {!validEmail ? 'Enter email' : plan.cta}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -455,24 +552,28 @@ export default function Home() {
             </div>
 
             <div className="mt-12 text-center">
-              <p className="text-sm text-muted-foreground">Alle Pläne beinhalten Web-Galerie, Mobile Apps und Export.</p>
+              <p className="text-sm text-muted-foreground">
+                {platform === 'immich'
+                  ? 'All plans include web gallery, mobile apps, and export.'
+                  : 'All plans include web interface, desktop & mobile apps, and export.'}
+              </p>
             </div>
           </div>
         </section>
 
-        <section id="faq" className="py-24 md:py-32">
+        <section id="faq" className="py-24 md:py-32 section-alt">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">FAQ</h2>
-              <p className="mt-4 text-muted-foreground text-lg">Kurz und ehrlich beantwortet.</p>
+              <h2 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">FAQ</h2>
+              <p className="mt-4 text-muted-foreground text-lg">Quick and honest answers.</p>
             </div>
 
             <div className="mt-12 max-w-2xl mx-auto space-y-3">
               {faqs.map((faq) => (
-                <details key={faq.q} className="group rounded-xl border border-border/50 bg-card/50 p-0 overflow-hidden">
-                  <summary className="cursor-pointer list-none select-none p-5 hover:bg-secondary/30 transition-colors">
+                <details key={faq.q} className="group rounded-xl border border-border/50 bg-card/50 dark:bg-card/30 p-0 overflow-hidden">
+                  <summary className="cursor-pointer list-none select-none p-5 hover:bg-secondary/50 dark:hover:bg-secondary/20 transition-colors">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="font-medium text-left">{faq.q}</span>
+                      <span className="font-heading font-medium text-left">{faq.q}</span>
                       <ChevronDown className="h-4 w-4 text-muted-foreground group-open:rotate-180 transition-transform flex-shrink-0" />
                     </div>
                   </summary>
@@ -485,22 +586,28 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-24 md:py-32 bg-secondary/30">
+        <section className="py-24 md:py-32">
           <div className="container px-4 md:px-6">
             <div className="max-w-2xl mx-auto text-center">
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Bereit für eine Foto-Cloud, die sich richtig anfühlt?</h2>
+              <h2 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">
+                {platform === 'immich'
+                  ? 'Ready for a photo cloud that feels right?'
+                  : 'Ready for a workspace that respects your privacy?'}
+              </h2>
               <p className="mt-6 text-muted-foreground text-lg text-balance">
-                Starte kostenlos und upgrade später — wenn du merkst, dass du nicht mehr zurück willst.
+                {platform === 'immich'
+                  ? 'Start for free and upgrade later — when you realize you don\'t want to go back.'
+                  : 'Get started today and experience true data ownership.'}
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" asChild>
+                <Button size="lg" asChild className="btn-cta">
                   <a href="#pricing">
-                    Jetzt kostenlos starten
+                    {platform === 'immich' ? 'Start for free' : 'Get started'}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <a href={`mailto:hello@${DOMAIN}`}>Fragen stellen</a>
+                <Button size="lg" variant="outline" asChild className="glass">
+                  <a href={`mailto:hello@${DOMAIN}`}>Ask questions</a>
                 </Button>
               </div>
             </div>
@@ -508,41 +615,41 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t py-12">
+      <footer className="border-t border-border/50 py-12 bg-card/30 dark:bg-card/10">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground">
-                <Cloud className="h-3.5 w-3.5 text-background" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Cloud className="h-3.5 w-3.5" />
               </div>
-              <span className="font-semibold">SPhoto</span>
-              <span className="text-sm text-muted-foreground">· Europa</span>
+              <span className="font-heading font-semibold">SPhoto</span>
+              <span className="text-sm text-muted-foreground">- EU Hosted</span>
             </div>
 
             <nav className="flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
               <Link href="#pricing" className="hover:text-foreground transition-colors">
-                Preise
+                Pricing
               </Link>
               <Link href="#faq" className="hover:text-foreground transition-colors">
                 FAQ
               </Link>
               <a href={`mailto:hello@${DOMAIN}`} className="hover:text-foreground transition-colors">
-                Kontakt
+                Contact
               </a>
               <a
-                href="https://immich.app"
+                href={platform === 'immich' ? 'https://immich.app' : 'https://nextcloud.com'}
                 target="_blank"
                 rel="noreferrer"
                 className="hover:text-foreground transition-colors"
               >
-                Powered by Immich
+                Powered by {platform === 'immich' ? 'Immich' : 'Nextcloud'}
               </a>
               <Link href="/admin" className="hover:text-foreground transition-colors">
                 Admin
               </Link>
             </nav>
 
-            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} SPhoto · 🇪🇺</p>
+            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} SPhoto</p>
           </div>
         </div>
       </footer>

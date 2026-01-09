@@ -12,6 +12,13 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Build args for Next.js public env vars (needed at build time)
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_DOMAIN
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_DOMAIN=$NEXT_PUBLIC_DOMAIN
+
 RUN bun run build
 
 # Production image - use node for running (more stable for Next.js standalone)

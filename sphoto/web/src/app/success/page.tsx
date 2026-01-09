@@ -43,7 +43,7 @@ function EmailLink({ email }: { email: string }) {
           rel="noreferrer"
         >
           <Mail className="mr-2 h-4 w-4" />
-          Gmail öffnen
+          Open Gmail
         </a>
       </Button>
     )
@@ -58,7 +58,7 @@ function EmailLink({ email }: { email: string }) {
           rel="noreferrer"
         >
           <Mail className="mr-2 h-4 w-4" />
-          Outlook öffnen
+          Open Outlook
         </a>
       </Button>
     )
@@ -81,17 +81,17 @@ interface SessionStatus {
 const POLL_INTERVAL_MS = 3000
 const MAX_POLLS = 60 // max ~3 minutes
 
-// Translate common error messages to German
+// Translate common error messages
 function translateError(error: string): string {
   const translations: Record<string, string> = {
-    'Email already registered': 'Diese E-Mail-Adresse ist bereits registriert.',
-    'Email+already+registered': 'Diese E-Mail-Adresse ist bereits registriert.',
-    'Email is required': 'E-Mail-Adresse ist erforderlich.',
-    'Email+is+required': 'E-Mail-Adresse ist erforderlich.',
-    'Invalid email format': 'Ungültiges E-Mail-Format.',
-    'Invalid+email+format': 'Ungültiges E-Mail-Format.',
-    'Failed to create account': 'Kontoeröffnung fehlgeschlagen. Bitte versuche es erneut.',
-    'Failed+to+create+account': 'Kontoeröffnung fehlgeschlagen. Bitte versuche es erneut.',
+    'Email already registered': 'This email address is already registered.',
+    'Email+already+registered': 'This email address is already registered.',
+    'Email is required': 'Email address is required.',
+    'Email+is+required': 'Email address is required.',
+    'Invalid email format': 'Invalid email format.',
+    'Invalid+email+format': 'Invalid email format.',
+    'Failed to create account': 'Account creation failed. Please try again.',
+    'Failed+to+create+account': 'Account creation failed. Please try again.',
   }
   
   // Check for exact match first
@@ -100,10 +100,10 @@ function translateError(error: string): string {
   // Check if error contains known patterns
   const decoded = decodeURIComponent(error.replace(/\+/g, ' '))
   if (decoded.includes('User exists') || decoded.includes('already exists') || decoded.includes('already registered')) {
-    return 'Diese E-Mail-Adresse ist bereits registriert.'
+    return 'This email address is already registered.'
   }
   if (decoded.includes('Invalid email')) {
-    return 'Ungültiges E-Mail-Format.'
+    return 'Invalid email format.'
   }
   
   // Return decoded error as fallback
@@ -123,7 +123,7 @@ function SuccessContent() {
   // Check if this is a free signup redirect
   const isFreeSignup = freePlan === "free" && freeEmail && freeInstance
   
-  const [status, setStatus] = useState<SessionStatus>({ status: "processing", message: "Laden..." })
+  const [status, setStatus] = useState<SessionStatus>({ status: "processing", message: "Loading..." })
   const [progress, setProgress] = useState(0)
   const pollCount = useRef(0)
 
@@ -144,7 +144,7 @@ function SuccessContent() {
         setProgress(100)
       }
     } catch {
-      setStatus({ status: "error", message: "Verbindungsfehler – bitte Seite neu laden" })
+      setStatus({ status: "error", message: "Connection error — please reload the page" })
     }
   }, [sessionId])
 
@@ -158,7 +158,7 @@ function SuccessContent() {
       if (pollCount.current > MAX_POLLS) {
         setStatus({
           status: "error",
-          message: "Timeout – bitte Support kontaktieren falls die Instanz nicht erscheint.",
+          message: "Timeout — please contact support if your instance doesn't appear.",
         })
         clearInterval(interval)
         return
@@ -177,23 +177,23 @@ function SuccessContent() {
   // Handle error from redirect
   if (errorParam) {
     const errorMessage = translateError(errorParam)
-    const isEmailExists = errorMessage.includes('bereits registriert')
+    const isEmailExists = errorMessage.includes('already registered')
     
     return (
       <Card className="max-w-md border-destructive">
         <CardHeader className="text-center">
           <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
-          <CardTitle>Registrierung fehlgeschlagen</CardTitle>
+          <CardTitle>Registration failed</CardTitle>
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-muted-foreground">{errorMessage}</p>
           {isEmailExists && (
             <p className="text-sm text-muted-foreground">
-              Falls du dein Passwort vergessen hast, melde dich bei deiner Immich-Instanz an und nutze die &quot;Passwort vergessen&quot; Funktion.
+              If you forgot your password, log in to your Immich instance and use the &quot;Forgot password&quot; feature.
             </p>
           )}
           <Button className="mt-2" asChild>
-            <Link href="/">Zur Startseite</Link>
+            <Link href="/">Back to home</Link>
           </Button>
         </CardContent>
       </Card>
@@ -207,13 +207,13 @@ function SuccessContent() {
         <CardHeader className="text-center pb-4">
           <CheckCircle className="h-14 w-14 text-foreground mx-auto mb-4" />
           <CardTitle className="text-2xl flex items-center justify-center gap-2">
-            Dein Konto ist bereit
+            Your account is ready
           </CardTitle>
-          <CardDescription>Du kannst dich jetzt anmelden und loslegen.</CardDescription>
+          <CardDescription>You can now log in and get started.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="bg-secondary rounded-xl p-5 text-center">
-            <p className="text-sm text-muted-foreground mb-2">Deine URL:</p>
+            <p className="text-sm text-muted-foreground mb-2">Your URL:</p>
             <a
               href={freeInstance}
               target="_blank"
@@ -236,9 +236,9 @@ function SuccessContent() {
             <div className="flex items-start gap-4">
               <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">E-Mail gesendet</p>
+                <p className="font-medium">Email sent</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Deine Login-Daten wurden an <span className="font-mono text-foreground">{freeEmail}</span> gesendet.
+                  Your login credentials were sent to <span className="font-mono text-foreground">{freeEmail}</span>.
                 </p>
                 <div className="mt-3">
                   <EmailLink email={freeEmail} />
@@ -249,9 +249,9 @@ function SuccessContent() {
             <div className="flex items-start gap-4">
               <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Mobile App</p>
+                <p className="font-medium">Mobile app</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
+                  Download the <strong>Immich</strong> app and connect with your URL.
                 </p>
                 <div className="mt-3 flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" asChild>
@@ -279,7 +279,7 @@ function SuccessContent() {
 
           <Button className="w-full" size="lg" asChild>
             <a href={freeInstance} target="_blank" rel="noreferrer">
-              Zur Cloud öffnen
+              Open your cloud
               <ArrowRight className="ml-2 h-4 w-4" />
             </a>
           </Button>
@@ -293,12 +293,12 @@ function SuccessContent() {
       <Card className="max-w-md">
         <CardHeader className="text-center">
           <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
-          <CardTitle>Keine Session gefunden</CardTitle>
-          <CardDescription>Der Link ist ungültig oder abgelaufen.</CardDescription>
+          <CardTitle>No session found</CardTitle>
+          <CardDescription>The link is invalid or expired.</CardDescription>
         </CardHeader>
         <CardContent className="text-center">
           <Button className="mt-2" asChild>
-            <Link href="/">Zur Startseite</Link>
+            <Link href="/">Back to home</Link>
           </Button>
         </CardContent>
       </Card>
@@ -310,8 +310,8 @@ function SuccessContent() {
       <Card className="max-w-md w-full">
         <CardHeader className="text-center pb-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-foreground mb-4" />
-          <CardTitle>Deine Cloud wird erstellt...</CardTitle>
-          <CardDescription>Das dauert normalerweise 1–2 Minuten.</CardDescription>
+          <CardTitle>Creating your cloud...</CardTitle>
+          <CardDescription>This usually takes 1-2 minutes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
@@ -323,23 +323,23 @@ function SuccessContent() {
           <div className="space-y-3 text-sm">
             <div className={`flex items-center gap-3 ${progress >= 10 ? "text-foreground" : "text-muted-foreground"}`}>
               {progress >= 10 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Zahlung erhalten
+              Payment received
             </div>
             <div className={`flex items-center gap-3 ${progress >= 40 ? "text-foreground" : progress >= 10 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
               {progress >= 40 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Container werden gestartet
+              Starting containers
             </div>
             <div className={`flex items-center gap-3 ${progress >= 70 ? "text-foreground" : progress >= 40 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
               {progress >= 70 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              SSL-Zertifikat wird erstellt
+              Creating SSL certificate
             </div>
             <div className={`flex items-center gap-3 ${progress >= 100 ? "text-foreground" : progress >= 70 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
               {progress >= 100 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Account wird eingerichtet
+              Setting up account
             </div>
           </div>
           <p className="text-xs text-center text-muted-foreground">
-            Diese Seite aktualisiert sich automatisch.
+            This page updates automatically.
           </p>
         </CardContent>
       </Card>
@@ -351,16 +351,16 @@ function SuccessContent() {
       <Card className="max-w-md border-destructive">
         <CardHeader className="text-center">
           <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
-          <CardTitle>Etwas ist schiefgelaufen</CardTitle>
+          <CardTitle>Something went wrong</CardTitle>
         </CardHeader>
         <CardContent className="text-center space-y-4">
-          <p className="text-muted-foreground">{status.message || "Unbekannter Fehler"}</p>
+          <p className="text-muted-foreground">{status.message || "Unknown error"}</p>
           <div className="flex flex-col gap-2">
             <Button variant="outline" onClick={() => window.location.reload()}>
-              Seite neu laden
+              Reload page
             </Button>
             <Button variant="ghost" asChild>
-              <a href={`mailto:support@${DOMAIN}`}>Support kontaktieren</a>
+              <a href={`mailto:support@${DOMAIN}`}>Contact support</a>
             </Button>
           </div>
         </CardContent>
@@ -374,13 +374,13 @@ function SuccessContent() {
       <CardHeader className="text-center pb-4">
         <CheckCircle className="h-14 w-14 text-foreground mx-auto mb-4" />
         <CardTitle className="text-2xl flex items-center justify-center gap-2">
-          Deine Cloud ist bereit
+          Your cloud is ready
         </CardTitle>
-        <CardDescription>Du kannst dich jetzt anmelden und loslegen.</CardDescription>
+        <CardDescription>You can now log in and get started.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="bg-secondary rounded-xl p-5 text-center">
-          <p className="text-sm text-muted-foreground mb-2">Deine URL:</p>
+          <p className="text-sm text-muted-foreground mb-2">Your URL:</p>
           <a
             href={status.instanceUrl}
             target="_blank"
@@ -408,9 +408,9 @@ function SuccessContent() {
           <div className="flex items-start gap-4">
             <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium">E-Mail gesendet</p>
+              <p className="font-medium">Email sent</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Deine Login-Daten wurden an <span className="font-mono text-foreground">{status.email}</span> gesendet.
+                Your login credentials were sent to <span className="font-mono text-foreground">{status.email}</span>.
               </p>
               {status.email && (
                 <div className="mt-3">
@@ -423,11 +423,11 @@ function SuccessContent() {
           <div className="flex items-start gap-4">
             <Smartphone className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium">Mobile App</p>
+              <p className="font-medium">Mobile app</p>
               {status.platform === "nextcloud" ? (
                 <>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Lade die <strong>Nextcloud</strong> App und verbinde mit deiner URL.
+                    Download the <strong>Nextcloud</strong> app and connect with your URL.
                   </p>
                   <div className="mt-3 flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
@@ -462,7 +462,7 @@ function SuccessContent() {
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Lade die <strong>Immich</strong> App und verbinde mit deiner URL.
+                    Download the <strong>Immich</strong> app and connect with your URL.
                   </p>
                   <div className="mt-3 flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" asChild>
@@ -492,7 +492,7 @@ function SuccessContent() {
 
         <Button className="w-full" size="lg" asChild>
           <a href={status.instanceUrl} target="_blank" rel="noreferrer">
-            Zur Cloud öffnen
+            Open your cloud
             <ArrowRight className="ml-2 h-4 w-4" />
           </a>
         </Button>
@@ -509,7 +509,7 @@ export default function SuccessPage() {
           <Card className="max-w-md w-full">
             <CardContent className="py-12 text-center">
               <Loader2 className="h-10 w-10 animate-spin mx-auto text-foreground" />
-              <p className="mt-4 text-sm text-muted-foreground">Lade Status...</p>
+              <p className="mt-4 text-sm text-muted-foreground">Loading status...</p>
             </CardContent>
           </Card>
         }

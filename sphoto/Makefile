@@ -87,9 +87,13 @@ dev: immich
 	@echo "Or use 'make dev-all' to run everything in background (no hot reload)"
 
 dev-all: immich
+	@if [ ! -f .env.local ]; then \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
 	@echo "Starting web and automation in background..."
-	@cd web && bun install && bun run dev &
-	@cd automation && bun install && bun run dev &
+	@set -a && . ./.env.local && set +a && cd web && bun install && bun run dev &
+	@set -a && . ./.env.local && set +a && cd automation && bun install && bun run dev &
 	@echo "All services started in background"
 
 dev-down: immich-down

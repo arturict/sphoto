@@ -1,12 +1,31 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Poppins, Open_Sans } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-heading",
+  display: "swap",
+})
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-  title: "SPhoto - Deine private Photo Cloud",
-  description: "Google Photos Alternative mit Schweizer Hosting. Ab 5 CHF/Monat.",
+  title: "SPhoto - Your Private Photo Cloud",
+  description: "Google Photos alternative with EU hosting. Privacy-first, no tracking. From 5 CHF/month.",
+  keywords: ["photo cloud", "photo backup", "immich", "google photos alternative", "privacy", "eu hosting"],
+  openGraph: {
+    title: "SPhoto - Your Private Photo Cloud",
+    description: "Google Photos alternative with EU hosting. Privacy-first, no tracking.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({
@@ -15,8 +34,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="de">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${poppins.variable} ${openSans.variable} font-body antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

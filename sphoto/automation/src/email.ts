@@ -32,62 +32,62 @@ export async function sendWelcomeEmail(
   const loginInfo = password 
     ? `
         <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Deine Login-Daten:</p>
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Your login credentials:</p>
           ${isNextcloud 
-            ? `<p style="margin: 5px 0;"><strong>Benutzername:</strong> ${nextcloudUser}</p>`
-            : `<p style="margin: 5px 0;"><strong>E-Mail:</strong> ${email}</p>`
+            ? `<p style="margin: 5px 0;"><strong>Username:</strong> ${nextcloudUser}</p>`
+            : `<p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>`
           }
-          <p style="margin: 5px 0;"><strong>Passwort:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
-          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Bitte ändere dein Passwort nach dem ersten Login.</p>
+          <p style="margin: 5px 0;"><strong>Password:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Please change your password after your first login.</p>
         </div>
       `
     : `
         <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0;">Öffne die URL und erstelle deinen Admin-Account.</p>
+          <p style="margin: 0;">Open the URL and create your admin account.</p>
         </div>
       `;
 
   const nextSteps = isNextcloud
     ? `
-        <h3>Nächste Schritte:</h3>
+        <h3>Next steps:</h3>
         <ol>
-          <li>Öffne <a href="${url}">${url}</a></li>
-          ${password ? '<li>Logge dich mit den obigen Daten ein</li>' : '<li>Erstelle deinen Account</li>'}
-          <li>Lade die <strong>Nextcloud App</strong> (iOS/Android/Desktop)</li>
-          <li>Verbinde mit: <code>${url}</code></li>
+          <li>Open <a href="${url}">${url}</a></li>
+          ${password ? '<li>Log in with the credentials above</li>' : '<li>Create your account</li>'}
+          <li>Download the <strong>Nextcloud app</strong> (iOS/Android/Desktop)</li>
+          <li>Connect with: <code>${url}</code></li>
         </ol>
         <p style="margin-top: 15px;">
-          <strong>Apps herunterladen:</strong><br>
+          <strong>Download apps:</strong><br>
           <a href="https://nextcloud.com/install/#install-clients" style="color: #0070f3;">nextcloud.com/install</a>
         </p>
       `
     : `
-        <h3>Nächste Schritte:</h3>
+        <h3>Next steps:</h3>
         <ol>
-          <li>Öffne <a href="${url}">${url}</a></li>
-          ${password ? '<li>Logge dich mit den obigen Daten ein</li>' : '<li>Erstelle deinen Account</li>'}
-          <li>Lade die <strong>Immich App</strong> (iOS/Android)</li>
-          <li>Verbinde mit: <code>${url}</code></li>
+          <li>Open <a href="${url}">${url}</a></li>
+          ${password ? '<li>Log in with the credentials above</li>' : '<li>Create your account</li>'}
+          <li>Download the <strong>Immich app</strong> (iOS/Android)</li>
+          <li>Connect with: <code>${url}</code></li>
         </ol>
       `;
 
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: `${platformIcon} Deine SPhoto ${platformName} Cloud ist bereit!`,
+    subject: `${platformIcon} Your SPhoto ${platformName} cloud is ready!`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Deine persönliche ${platformName} Cloud ist bereit.</p>
+        <p>Hello!</p>
+        <p>Your personal ${platformName} cloud is ready.</p>
         
         <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> ${planName} (${storageGb} GB)</p>
-          <p style="margin: 0 0 10px 0;"><strong>Plattform:</strong> ${platformName}</p>
-          <p style="margin: 0;"><strong>Deine URL:</strong></p>
+          <p style="margin: 0 0 10px 0;"><strong>Platform:</strong> ${platformName}</p>
+          <p style="margin: 0;"><strong>Your URL:</strong></p>
           <p style="margin: 5px 0 0 0; font-size: 18px;">
             <a href="${url}" style="color: #dc2626;">${url}</a>
           </p>
@@ -98,12 +98,12 @@ export async function sendWelcomeEmail(
         ${nextSteps}
         
         <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Wichtig:</strong> SPhoto ist ein Budget-Service ohne Backup. 
-          Erstelle eigene Backups!
+          ⚠️ <strong>Important:</strong> SPhoto is a budget service without backups. 
+          Please create your own backups!
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Questions? Contact support@arturf.ch
         </p>
       </div>
     `
@@ -140,47 +140,47 @@ export async function sendWelcomeEmailShared(
   const loginInfo = password 
     ? `
         <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Deine Login-Daten:</p>
-          <p style="margin: 5px 0;"><strong>E-Mail:</strong> ${email}</p>
-          <p style="margin: 5px 0;"><strong>Passwort:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
-          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Bitte ändere dein Passwort nach dem ersten Login.</p>
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Your login credentials:</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Password:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Please change your password after your first login.</p>
         </div>
       `
     : `
         <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0;">Dein Account wurde erstellt. Logge dich mit deiner E-Mail-Adresse ein.</p>
+          <p style="margin: 0;">Your account has been created. Log in with your email address.</p>
         </div>
       `;
 
   const mlNote = isFree
     ? `
         <p style="background: #e0e7ff; padding: 10px; border-radius: 4px; font-size: 14px;">
-          💡 <strong>Free Plan:</strong> Gesichtserkennung und Smart Search sind deaktiviert.
-          <a href="https://${env.DOMAIN}" style="color: #4f46e5;">Upgrade auf einen bezahlten Plan</a> für alle Features.
+          💡 <strong>Free Plan:</strong> Face recognition and Smart Search are disabled.
+          <a href="https://${env.DOMAIN}" style="color: #4f46e5;">Upgrade to a paid plan</a> for all features.
         </p>
       `
     : `
         <p style="background: #dcfce7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ✨ <strong>${planName} Plan:</strong> Gesichtserkennung und Smart Search sind aktiviert!
+          ✨ <strong>${planName} Plan:</strong> Face recognition and Smart Search are enabled!
         </p>
       `;
 
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: `📸 Deine SPhoto ${planName} Cloud ist bereit!`,
+    subject: `📸 Your SPhoto ${planName} cloud is ready!`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Dein SPhoto Account ist bereit.</p>
+        <p>Hello!</p>
+        <p>Your SPhoto account is ready.</p>
         
         <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> ${planName} (${storageGb} GB)</p>
-          <p style="margin: 0;"><strong>Deine URL:</strong></p>
+          <p style="margin: 0;"><strong>Your URL:</strong></p>
           <p style="margin: 5px 0 0 0; font-size: 18px;">
             <a href="${url}" style="color: #dc2626;">${url}</a>
           </p>
@@ -188,23 +188,23 @@ export async function sendWelcomeEmailShared(
         
         ${loginInfo}
         
-        <h3>Nächste Schritte:</h3>
+        <h3>Next steps:</h3>
         <ol>
-          <li>Öffne <a href="${url}">${url}</a></li>
-          <li>Logge dich mit deinen Daten ein</li>
-          <li>Lade die <strong>Immich App</strong> (iOS/Android)</li>
-          <li>Verbinde mit: <code>${url}</code></li>
+          <li>Open <a href="${url}">${url}</a></li>
+          <li>Log in with your credentials</li>
+          <li>Download the <strong>Immich app</strong> (iOS/Android)</li>
+          <li>Connect with: <code>${url}</code></li>
         </ol>
         
         ${mlNote}
         
         <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Wichtig:</strong> SPhoto ist ein Budget-Service ohne Backup. 
-          Erstelle eigene Backups!
+          ⚠️ <strong>Important:</strong> SPhoto is a budget service without backups. 
+          Please create your own backups!
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Questions? Contact support@arturf.ch
         </p>
       </div>
     `
@@ -241,21 +241,21 @@ export async function sendPlanChangeEmail(
     from: env.EMAIL_FROM,
     to: email,
     subject: isFree 
-      ? '📸 SPhoto: Dein Plan wurde geändert' 
-      : '🎉 SPhoto: Willkommen beim neuen Plan!',
+      ? '📸 SPhoto: Your plan has been changed' 
+      : '🎉 SPhoto: Welcome to your new plan!',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Dein SPhoto Plan wurde ${isFree ? 'auf Free zurückgesetzt' : 'aktualisiert'}.</p>
+        <p>Hello!</p>
+        <p>Your SPhoto plan has been ${isFree ? 'reset to Free' : 'updated'}.</p>
         
         <div style="background: ${isFree ? '#fef3c7' : '#dcfce7'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0 0 10px 0;"><strong>Neuer Plan:</strong> ${newPlanName}</p>
-          <p style="margin: 0 0 10px 0;"><strong>Speicher:</strong> ${newStorageGb} GB</p>
-          <p style="margin: 0;"><strong>Deine URL:</strong></p>
+          <p style="margin: 0 0 10px 0;"><strong>New plan:</strong> ${newPlanName}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Storage:</strong> ${newStorageGb} GB</p>
+          <p style="margin: 0;"><strong>Your URL:</strong></p>
           <p style="margin: 5px 0 0 0; font-size: 18px;">
             <a href="${url}" style="color: #dc2626;">${url}</a>
           </p>
@@ -263,17 +263,17 @@ export async function sendPlanChangeEmail(
         
         ${isFree ? `
           <p style="background: #fee2e2; padding: 10px; border-radius: 4px; font-size: 14px;">
-            ⚠️ <strong>Wichtig:</strong> Deine Fotos wurden <strong>nicht</strong> automatisch migriert.
-            Bitte lade sie erneut hoch oder reaktiviere dein Abo.
+            ⚠️ <strong>Important:</strong> Your photos were <strong>not</strong> automatically migrated.
+            Please upload them again or reactivate your subscription.
           </p>
         ` : `
           <p style="background: #dcfce7; padding: 10px; border-radius: 4px; font-size: 14px;">
-            ✨ Gesichtserkennung und Smart Search sind jetzt aktiviert!
+            ✨ Face recognition and Smart Search are now enabled!
           </p>
         `}
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Questions? Contact support@arturf.ch
         </p>
       </div>
     `
@@ -307,13 +307,13 @@ export async function sendPaymentFailedEmail(email: string, id: string): Promise
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: '⚠️ SPhoto: Zahlung fehlgeschlagen',
+    subject: '⚠️ SPhoto: Payment failed',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1><span style="color: #dc2626;">S</span>Photo</h1>
-        <p>Deine letzte Zahlung ist fehlgeschlagen.</p>
-        <p><strong>Dein Account wurde pausiert.</strong></p>
-        <p>Deine Daten bleiben 30 Tage gespeichert. Aktualisiere deine Zahlungsmethode um fortzufahren.</p>
+        <p>Your last payment has failed.</p>
+        <p><strong>Your account has been paused.</strong></p>
+        <p>Your data will be kept for 30 days. Update your payment method to continue.</p>
       </div>
     `
   });
@@ -346,37 +346,37 @@ export async function sendExportReadyEmail(
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: '📦 Dein SPhoto Export ist bereit',
+    subject: '📦 Your SPhoto export is ready',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Dein Daten-Export ist fertig und steht zum Download bereit.</p>
+        <p>Hello!</p>
+        <p>Your data export is complete and ready for download.</p>
         
         <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">📦 Export Details:</p>
-          <p style="margin: 5px 0;"><strong>Instanz:</strong> ${instanceId}</p>
-          <p style="margin: 5px 0;"><strong>Grösse:</strong> ${formatBytes(fileSizeBytes)}</p>
-          <p style="margin: 5px 0;"><strong>Gültig bis:</strong> 24 Stunden</p>
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">📦 Export details:</p>
+          <p style="margin: 5px 0;"><strong>Instance:</strong> ${instanceId}</p>
+          <p style="margin: 5px 0;"><strong>Size:</strong> ${formatBytes(fileSizeBytes)}</p>
+          <p style="margin: 5px 0;"><strong>Valid for:</strong> 24 hours</p>
         </div>
         
         <div style="text-align: center; margin: 30px 0;">
           <a href="${downloadUrl}" 
              style="display: inline-block; background: #dc2626; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            Download starten
+            Start download
           </a>
         </div>
         
         <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Wichtig:</strong> Der Download-Link ist nur 24 Stunden gültig. 
-          Danach wird die Datei automatisch gelöscht.
+          ⚠️ <strong>Important:</strong> The download link is only valid for 24 hours. 
+          After that, the file will be automatically deleted.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Dieser Export wurde gemäss DSGVO Art. 20 (Recht auf Datenübertragbarkeit) erstellt.
+          This export was created in accordance with GDPR Art. 20 (Right to data portability).
         </p>
       </div>
     `
@@ -415,22 +415,22 @@ export async function sendPortalLoginEmail(
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Klicke auf den Button unten um dich in dein SPhoto Portal einzuloggen.</p>
+        <p>Hello!</p>
+        <p>Click the button below to log in to your SPhoto Portal.</p>
         
         <div style="text-align: center; margin: 30px 0;">
           <a href="${loginUrl}" 
              style="display: inline-block; background: #dc2626; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            In Portal einloggen
+            Log in to Portal
           </a>
         </div>
         
         <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ Dieser Link ist 24 Stunden gültig und kann nur einmal verwendet werden.
+          ⚠️ This link is valid for 24 hours and can only be used once.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Falls du diesen Login nicht angefordert hast, ignoriere diese E-Mail.
+          If you didn't request this login, please ignore this email.
         </p>
       </div>
     `
@@ -453,7 +453,7 @@ export async function sendAccountDeletionEmail(
     return;
   }
 
-  const formattedDate = new Date(scheduledFor).toLocaleDateString('de-CH', {
+  const formattedDate = new Date(scheduledFor).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -463,35 +463,35 @@ export async function sendAccountDeletionEmail(
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: '⚠️ SPhoto: Account-Löschung geplant',
+    subject: '⚠️ SPhoto: Account deletion scheduled',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Du hast die Löschung deines SPhoto Accounts angefordert.</p>
+        <p>Hello!</p>
+        <p>You have requested the deletion of your SPhoto account.</p>
         
         <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #dc2626;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #dc2626;">🗓️ Löschung geplant für:</p>
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #dc2626;">🗓️ Deletion scheduled for:</p>
           <p style="margin: 0; font-size: 18px;">${formattedDate}</p>
         </div>
         
-        <p><strong>Was passiert dann?</strong></p>
+        <p><strong>What happens then?</strong></p>
         <ul>
-          <li>Alle deine Fotos und Videos werden unwiderruflich gelöscht</li>
-          <li>Dein Account wird vollständig entfernt</li>
-          <li>Ein aktives Abo wird automatisch gekündigt</li>
+          <li>All your photos and videos will be permanently deleted</li>
+          <li>Your account will be completely removed</li>
+          <li>Any active subscription will be automatically cancelled</li>
         </ul>
         
         <p style="background: #dcfce7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          💡 <strong>Meinung geändert?</strong> Du kannst die Löschung jederzeit vor dem geplanten Datum 
-          in deinem <a href="https://portal.${env.DOMAIN}" style="color: #dc2626;">SPhoto Portal</a> abbrechen.
+          💡 <strong>Changed your mind?</strong> You can cancel the deletion at any time before the scheduled date 
+          in your <a href="https://portal.${env.DOMAIN}" style="color: #dc2626;">SPhoto Portal</a>.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Questions? Contact support@arturf.ch
         </p>
       </div>
     `
@@ -516,24 +516,24 @@ export async function sendAccountDeletionCancelledEmail(
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: '✅ SPhoto: Account-Löschung abgebrochen',
+    subject: '✅ SPhoto: Account deletion cancelled',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #111;">
           <span style="color: #dc2626;">S</span>Photo
         </h1>
         
-        <p>Hallo!</p>
-        <p>Die geplante Löschung deines SPhoto Accounts wurde erfolgreich abgebrochen.</p>
+        <p>Hello!</p>
+        <p>The scheduled deletion of your SPhoto account has been successfully cancelled.</p>
         
         <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
-          <p style="margin: 0; font-weight: bold; color: #166534;">✅ Dein Account bleibt aktiv!</p>
+          <p style="margin: 0; font-weight: bold; color: #166534;">✅ Your account remains active!</p>
         </div>
         
-        <p>Du kannst SPhoto weiterhin wie gewohnt nutzen.</p>
+        <p>You can continue using SPhoto as usual.</p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Questions? Contact support@arturf.ch
         </p>
       </div>
     `
