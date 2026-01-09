@@ -14,8 +14,10 @@ import {
   getSharedUserByStripeCustomer,
   migrateUserBetweenInstances,
   deleteSharedUser,
+  scheduleSubscriptionCancellation,
 } from './shared-users';
-import { sendWelcomeEmail, sendWelcomeEmailShared, sendPaymentFailedEmail, sendPlanChangeEmail } from './email';
+import { sendWelcomeEmail, sendWelcomeEmailShared, sendPaymentFailedEmail, sendPlanChangeEmail, sendCancellationScheduledEmail } from './email';
+import { CANCELLATION } from './messages';
 import { handlePlanChange } from './plan-migration';
 import { getStripe, isStripeConfigured } from './lib/stripe';
 
@@ -201,15 +203,24 @@ async function handleWebhookShared(stripe: Stripe, event: Stripe.Event, res: Res
       const user = getSharedUserByStripeCustomer(sub.customer as string);
       
       if (user) {
-        // Downgrade to free tier (migrate to free instance)
-        console.log(`Subscription cancelled for ${user.email}, migrating to free tier`);
-        const result = await migrateUserBetweenInstances(user.visibleId, 'free');
+        // Schedule migration for grace period instead of immediate downgrade
+        // This gives users 14 days to export their data before losing photos
+        console.log(`Subscription cancelled for ${user.email}, scheduling grace period`);
         
-        if (result.success) {
+        const result = scheduleSubscriptionCancellation(user.visibleId);
+        
+        if (result.success && result.gracePeriodEnd) {
           const customer = await stripe.customers.retrieve(sub.customer as string);
           if (!('deleted' in customer) && customer.email) {
-            await sendPlanChangeEmail(customer.email, 'Free', FREE_TIER.quotaGB, 'free');
+            await sendCancellationScheduledEmail(
+              customer.email, 
+              result.gracePeriodEnd,
+              user.quotaGB
+            );
           }
+          console.log(`Grace period scheduled until ${result.gracePeriodEnd} for ${user.email}`);
+        } else {
+          console.error(`Failed to schedule cancellation: ${result.error}`);
         }
       }
       break;

@@ -304,22 +304,197 @@ export async function sendPaymentFailedEmail(email: string, id: string): Promise
     return;
   }
 
+  const billingUrl = `https://portal.${env.DOMAIN}`;
+
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to: email,
-    subject: '⚠️ SPhoto: Payment failed',
+    subject: '⚠️ SPhoto: Zahlung fehlgeschlagen',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h1><span style="color: #dc2626;">S</span>Photo</h1>
-        <p>Your last payment has failed.</p>
-        <p><strong>Your account has been paused.</strong></p>
-        <p>Your data will be kept for 30 days. Update your payment method to continue.</p>
+        
+        <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #dc2626;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #dc2626;">⚠️ Deine letzte Zahlung ist fehlgeschlagen.</p>
+          <p style="margin: 0;">Bitte aktualisiere deine Zahlungsmethode, um deinen Account aktiv zu halten.</p>
+        </div>
+        
+        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0;"><strong>⏰ Wichtige Fristen:</strong></p>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>Deine Daten bleiben <strong>30 Tage</strong> erhalten</li>
+            <li>Danach wird dein Konto auf den Free-Plan zurückgesetzt</li>
+            <li>Beim Free-Plan werden alle Fotos gelöscht</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${billingUrl}" 
+             style="display: inline-block; background: #dc2626; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            Zahlungsmethode aktualisieren
+          </a>
+        </div>
+        
+        <p style="text-align: center; color: #666; font-size: 14px;">
+          Oder logge dich ins Portal ein: <a href="${billingUrl}" style="color: #dc2626;">${billingUrl}</a>
+        </p>
+        
+        <p style="color: #666; font-size: 12px; margin-top: 30px; text-align: center;">
+          Fragen? Kontaktiere ${SUPPORT_EMAIL}
+        </p>
       </div>
     `
   });
 
   if (error) {
     console.error('Payment failed email error:', error);
+  } else {
+    console.log(`Payment failed email sent to ${email}`);
+  }
+}
+
+// =============================================================================
+// Cancellation Emails (Grace Period)
+// =============================================================================
+
+export async function sendCancellationScheduledEmail(
+  email: string,
+  gracePeriodEnd: string,
+  currentStorageGB: number
+): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send cancellation scheduled email to ${email} (Resend not configured)`);
+    return;
+  }
+
+  const formattedDate = new Date(gracePeriodEnd).toLocaleDateString('de-CH', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const portalUrl = `https://portal.${env.DOMAIN}`;
+
+  const { error } = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: email,
+    subject: '⚠️ SPhoto: Abo gekündigt – 14 Tage um deine Fotos zu sichern',
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #111;">
+          <span style="color: #dc2626;">S</span>Photo
+        </h1>
+        
+        <p>Hallo!</p>
+        <p>Dein SPhoto-Abo wurde gekündigt. Du hast noch <strong>14 Tage</strong> Zugriff auf alle deine Fotos.</p>
+        
+        <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #f59e0b;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #92400e;">⚠️ Wichtig: Sichere jetzt deine Fotos!</p>
+          <p style="margin: 0;">Nach dem <strong>${formattedDate}</strong> wird dein Konto auf den Free-Plan (5 GB) umgestellt und <strong>alle ${currentStorageGB} GB Fotos werden gelöscht</strong>.</p>
+        </div>
+        
+        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0;"><strong>So sicherst du deine Fotos:</strong></p>
+          <ol style="margin: 0; padding-left: 20px;">
+            <li>Logge dich ins <a href="${portalUrl}" style="color: #dc2626;">SPhoto Portal</a> ein</li>
+            <li>Klicke auf "Daten exportieren"</li>
+            <li>Warte auf die E-Mail mit dem Download-Link</li>
+            <li>Lade die ZIP-Datei herunter</li>
+          </ol>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${portalUrl}" 
+             style="display: inline-block; background: #dc2626; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            Fotos jetzt exportieren
+          </a>
+        </div>
+        
+        <p style="background: #dcfce7; padding: 10px; border-radius: 4px; font-size: 14px;">
+          💡 <strong>Doch nicht kündigen?</strong> Erneuere dein Abo jederzeit im <a href="${portalUrl}" style="color: #dc2626;">Portal</a> und behalte alle deine Fotos.
+        </p>
+        
+        <p style="color: #666; font-size: 12px; margin-top: 30px;">
+          Fragen? Kontaktiere ${SUPPORT_EMAIL}
+        </p>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Cancellation scheduled email error:', error);
+  } else {
+    console.log(`Cancellation scheduled email sent to ${email}`);
+  }
+}
+
+export async function sendCancellationReminderEmail(
+  email: string,
+  gracePeriodEnd: string,
+  daysRemaining: number
+): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send cancellation reminder email to ${email} (Resend not configured)`);
+    return;
+  }
+
+  const formattedDate = new Date(gracePeriodEnd).toLocaleDateString('de-CH', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const portalUrl = `https://portal.${env.DOMAIN}`;
+  
+  const urgencyColor = daysRemaining <= 1 ? '#dc2626' : daysRemaining <= 3 ? '#f59e0b' : '#3b82f6';
+  const urgencyBgColor = daysRemaining <= 1 ? '#fee2e2' : daysRemaining <= 3 ? '#fef3c7' : '#dbeafe';
+  const urgencyText = daysRemaining <= 1 
+    ? '🚨 Letzte Warnung: Morgen werden deine Fotos gelöscht!'
+    : daysRemaining <= 3 
+    ? '⚠️ Dringend: Nur noch wenige Tage!'
+    : '⏰ Erinnerung: Sichere deine Fotos';
+
+  const { error } = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: email,
+    subject: `${daysRemaining <= 1 ? '🚨' : '⚠️'} SPhoto: Noch ${daysRemaining} Tag${daysRemaining > 1 ? 'e' : ''} um deine Fotos zu sichern`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #111;">
+          <span style="color: #dc2626;">S</span>Photo
+        </h1>
+        
+        <div style="background: ${urgencyBgColor}; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid ${urgencyColor};">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: ${urgencyColor};">${urgencyText}</p>
+          <p style="margin: 0;">Am <strong>${formattedDate}</strong> werden alle deine Fotos gelöscht.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${portalUrl}" 
+             style="display: inline-block; background: ${urgencyColor}; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            Jetzt Fotos exportieren
+          </a>
+        </div>
+        
+        <p style="text-align: center; color: #666; font-size: 14px;">
+          Oder erneuere dein Abo: <a href="${portalUrl}" style="color: #dc2626;">Zum Portal</a>
+        </p>
+        
+        <p style="color: #666; font-size: 12px; margin-top: 30px; text-align: center;">
+          Fragen? Kontaktiere ${SUPPORT_EMAIL}
+        </p>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Cancellation reminder email error:', error);
+  } else {
+    console.log(`Cancellation reminder (${daysRemaining}d) email sent to ${email}`);
   }
 }
 

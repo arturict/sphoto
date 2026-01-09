@@ -54,11 +54,14 @@ export interface SharedUser {
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   created: string;
-  status: 'active' | 'disabled' | 'pending_deletion' | 'deleted';
+  status: 'active' | 'disabled' | 'pending_deletion' | 'pending_cancellation' | 'deleted';
   lastExportAt?: string;
   // Deletion scheduling
   deletionRequestedAt?: string;  // When user requested deletion
   deletionScheduledFor?: string; // When deletion will happen (2 weeks later)
+  // Cancellation scheduling (subscription cancelled but grace period active)
+  cancellationScheduledAt?: string;      // When subscription was cancelled
+  cancellationGracePeriodEnd?: string;   // When grace period ends (14 days after cancellation)
   // Portal authentication
   portalToken?: string;          // Token for user portal access
   portalTokenExpiresAt?: string;

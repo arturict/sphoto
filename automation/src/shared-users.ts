@@ -651,6 +651,139 @@ export function listPendingDeletions(): SharedUser[] {
 }
 
 // =============================================================================
+// Subscription Cancellation with Grace Period
+// =============================================================================
+
+const CANCELLATION_GRACE_DAYS = 14;
+
+export function scheduleSubscriptionCancellation(visibleId: string): { 
+  success: boolean; 
+  gracePeriodEnd?: string;
+  error?: string;
+} {
+  const user = getSharedUser(visibleId);
+  if (!user) return { success: false, error: 'User not found' };
+  
+  if (user.status === 'deleted') {
+    return { success: false, error: 'Account already deleted' };
+  }
+  
+  // If already pending cancellation, return the existing date
+  if (user.status === 'pending_cancellation' && user.cancellationGracePeriodEnd) {
+    return { 
+      success: true, 
+      gracePeriodEnd: user.cancellationGracePeriodEnd,
+    };
+  }
+
+  const now = new Date();
+  const gracePeriodEnd = new Date(now.getTime() + CANCELLATION_GRACE_DAYS * 24 * 60 * 60 * 1000);
+
+  user.status = 'pending_cancellation';
+  user.cancellationScheduledAt = now.toISOString();
+  user.cancellationGracePeriodEnd = gracePeriodEnd.toISOString();
+  // Clear Stripe IDs since subscription is cancelled
+  delete user.stripeSubscriptionId;
+  
+  writeFileSync(getUserFilePath(visibleId), JSON.stringify(user, null, 2));
+  
+  console.log(`Subscription cancellation scheduled for ${user.email}, grace period ends ${gracePeriodEnd.toISOString()}`);
+  
+  return {
+    success: true,
+    gracePeriodEnd: gracePeriodEnd.toISOString(),
+  };
+}
+
+export function cancelSubscriptionCancellation(visibleId: string): { 
+  success: boolean; 
+  error?: string;
+} {
+  const user = getSharedUser(visibleId);
+  if (!user) return { success: false, error: 'User not found' };
+  
+  if (user.status !== 'pending_cancellation') {
+    return { success: false, error: 'Account is not pending cancellation' };
+  }
+
+  user.status = 'active';
+  delete user.cancellationScheduledAt;
+  delete user.cancellationGracePeriodEnd;
+  
+  writeFileSync(getUserFilePath(visibleId), JSON.stringify(user, null, 2));
+  
+  console.log(`Subscription cancellation cancelled for ${user.email}`);
+  
+  return { success: true };
+}
+
+export async function processScheduledCancellations(): Promise<{
+  processed: number;
+  migrated: string[];
+  errors: string[];
+}> {
+  const users = listSharedUsers();
+  const now = new Date();
+  const migrated: string[] = [];
+  const errors: string[] = [];
+
+  for (const user of users) {
+    if (user.status !== 'pending_cancellation' || !user.cancellationGracePeriodEnd) {
+      continue;
+    }
+
+    const gracePeriodEnd = new Date(user.cancellationGracePeriodEnd);
+    if (gracePeriodEnd > now) {
+      continue; // Grace period not over yet
+    }
+
+    console.log(`Processing scheduled cancellation for ${user.email} - migrating to free tier`);
+    
+    // Migrate to free tier (this deletes all photos)
+    const result = await migrateUserBetweenInstances(user.visibleId, 'free');
+    
+    if (result.success) {
+      // Clear cancellation fields after successful migration
+      const updatedUser = getSharedUser(user.visibleId);
+      if (updatedUser) {
+        updatedUser.status = 'active';
+        delete updatedUser.cancellationScheduledAt;
+        delete updatedUser.cancellationGracePeriodEnd;
+        writeFileSync(getUserFilePath(user.visibleId), JSON.stringify(updatedUser, null, 2));
+      }
+      migrated.push(user.email);
+    } else {
+      errors.push(`${user.email}: ${result.message}`);
+    }
+  }
+
+  return {
+    processed: migrated.length + errors.length,
+    migrated,
+    errors,
+  };
+}
+
+export function listPendingCancellations(): SharedUser[] {
+  return listSharedUsers().filter(u => u.status === 'pending_cancellation');
+}
+
+export function getUsersNeedingCancellationReminder(daysRemaining: number): SharedUser[] {
+  const now = new Date();
+  const targetDate = new Date(now.getTime() + daysRemaining * 24 * 60 * 60 * 1000);
+  const dayStart = new Date(targetDate.setHours(0, 0, 0, 0));
+  const dayEnd = new Date(targetDate.setHours(23, 59, 59, 999));
+  
+  return listSharedUsers().filter(u => {
+    if (u.status !== 'pending_cancellation' || !u.cancellationGracePeriodEnd) {
+      return false;
+    }
+    const gracePeriodEnd = new Date(u.cancellationGracePeriodEnd);
+    return gracePeriodEnd >= dayStart && gracePeriodEnd <= dayEnd;
+  });
+}
+
+// =============================================================================
 // Portal Authentication
 // =============================================================================
 
