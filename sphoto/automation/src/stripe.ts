@@ -38,12 +38,10 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, env.STRIPE_WEBHOOK_SECRET);
+    // Use constructEventAsync for Bun compatibility (SubtleCrypto requires async)
+    event = await stripe.webhooks.constructEventAsync(req.body, sig, env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('Webhook signature verification failed:', (err as Error).message);
-    console.error('Signature header:', sig?.substring(0, 50) + '...');
-    console.error('Secret used:', env.STRIPE_WEBHOOK_SECRET?.substring(0, 15) + '...');
-    console.error('Body type:', typeof req.body, 'isBuffer:', Buffer.isBuffer(req.body));
     res.status(400).send('Webhook Error');
     return;
   }
