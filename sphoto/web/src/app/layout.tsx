@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   title: "SPhoto - Your Private Photo Cloud",
   description: "Google Photos alternative with EU hosting. Privacy-first, no tracking. From 5 CHF/month.",
   keywords: ["photo cloud", "photo backup", "immich", "google photos alternative", "privacy", "eu hosting"],
+  icons: {
+    icon: "/favicon.svg",
+  },
   openGraph: {
     title: "SPhoto - Your Private Photo Cloud",
     description: "Google Photos alternative with EU hosting. Privacy-first, no tracking.",
