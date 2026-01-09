@@ -50,14 +50,14 @@ services:
     volumes:
       - ml-cache:/cache
     environment:
-      - MACHINE_LEARNING_WORKERS=2
+      - MACHINE_LEARNING_WORKERS=1
     networks:
       - sphoto-net
     restart: always
     deploy:
       resources:
         limits:
-          memory: 16G
+          memory: 2G
 
   # ===========================================================================
   # Automation Server (Stripe Webhooks)
