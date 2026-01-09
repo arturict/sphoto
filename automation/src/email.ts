@@ -403,7 +403,7 @@ export async function sendPortalLoginEmail(
     return;
   }
 
-  const loginUrl = `https://portal.${env.DOMAIN}/auth?token=${token}`;
+  const loginUrl = `https://${env.DOMAIN}/portal?token=${token}`;
 
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
@@ -487,7 +487,7 @@ export async function sendAccountDeletionEmail(
         
         <p style="background: #dcfce7; padding: 10px; border-radius: 4px; font-size: 14px;">
           💡 <strong>Changed your mind?</strong> You can cancel the deletion at any time before the scheduled date 
-          in your <a href="https://portal.${env.DOMAIN}" style="color: #dc2626;">SPhoto Portal</a>.
+          in your <a href="https://${env.DOMAIN}/portal" style="color: #dc2626;">SPhoto Portal</a>.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">

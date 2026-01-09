@@ -5,7 +5,7 @@
     "publicUsers": true
   },
   "theme": {
-    "customCss": ":root { --immich-primary: #3b82f6; --immich-bg: #f8fafc; } img[alt='Immich logo'] { content: url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 50\"><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"700\" fill=\"%233b82f6\">SPhoto</text></svg>'); height: 40px; width: auto; } #dashboard-navbar a[href=\"/\"] img, nav a[href=\"/\"] img { content: url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 30\"><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" font-family=\"system-ui, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"%233b82f6\">SPhoto</text></svg>'); height: 28px; width: auto; } #stencil svg { display: none !important; } #stencil::after { content: 'SPhoto'; font-size: 24px; font-weight: 700; color: #3b82f6; }"
+    "customCss": ":root { --immich-primary: #3b82f6; } img[alt='Immich logo'] { display: none !important; }"
   },
   "machineLearning": {
     "enabled": false,
