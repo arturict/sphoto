@@ -2,11 +2,12 @@
 // One-Click Data Export (DSGVO-compliant)
 // =============================================================================
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, createWriteStream, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, createWriteStream, unlinkSync, createReadStream } from 'fs';
 import { rm, stat, readdir, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createHash } from 'crypto';
 import type { ExportJob, InstanceMetadata, SharedUser } from './types';
 import { INSTANCES_DIR, EXTERNAL_STORAGE_PATH, env, SHARED_INSTANCES } from './config';
 
@@ -25,6 +26,17 @@ interface SharedExportJob extends ExportJob {
   totalAssets?: number;
   downloadedAssets?: number;
   notified?: boolean;
+}
+
+// Calculate SHA256 hash of a file
+async function calculateSHA256(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = createReadStream(filePath);
+    stream.on('data', (data) => hash.update(data));
+    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('error', reject);
+  });
 }
 
 export function generateExportToken(): string {
@@ -154,6 +166,9 @@ async function processExport(jobId: string): Promise<void> {
     // Get final file size
     const zipStats = await stat(zipPath);
     
+    // Calculate SHA256 checksum
+    const sha256 = await calculateSHA256(zipPath);
+    
     // Generate download token
     const token = generateExportToken();
     const expiresAt = new Date(Date.now() + EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
@@ -163,6 +178,7 @@ async function processExport(jobId: string): Promise<void> {
     job.downloadToken = token;
     job.expiresAt = expiresAt.toISOString();
     job.fileSize = zipStats.size;
+    job.sha256 = sha256;
     
     // Clean up temp directory
     await rm(exportDir, { recursive: true, force: true });
@@ -178,7 +194,7 @@ async function processExport(jobId: string): Promise<void> {
       }
     }, EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
     
-    console.log(`Export ${jobId} completed: ${zipPath} (${zipStats.size} bytes)`);
+    console.log(`Export ${jobId} completed: ${zipPath} (${zipStats.size} bytes, SHA256: ${sha256})`);
     
   } catch (err) {
     // Clean up on failure
@@ -483,6 +499,9 @@ async function processSharedUserExport(
     // Get final file size
     const zipStats = await stat(zipPath);
     
+    // Calculate SHA256 checksum
+    const sha256 = await calculateSHA256(zipPath);
+    
     // Generate download token
     const token = generateExportToken();
     const expiresAt = new Date(Date.now() + EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
@@ -492,6 +511,7 @@ async function processSharedUserExport(
     job.downloadToken = token;
     job.expiresAt = expiresAt.toISOString();
     job.fileSize = zipStats.size;
+    job.sha256 = sha256;
     
     // Clean up temp directory
     await rm(exportDir, { recursive: true, force: true });
@@ -507,7 +527,7 @@ async function processSharedUserExport(
       }
     }, EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
     
-    console.log(`[Export] Completed for ${job.email}: ${zipPath} (${zipStats.size} bytes)`);
+    console.log(`[Export] Completed for ${job.email}: ${zipPath} (${zipStats.size} bytes, SHA256: ${sha256})`);
     
   } catch (err) {
     // Clean up on failure

@@ -111,6 +111,7 @@ export interface ExportJob {
   expiresAt?: string;
   error?: string;
   fileSize?: number;
+  sha256?: string;
 }
 
 export interface CreateInstanceResult {

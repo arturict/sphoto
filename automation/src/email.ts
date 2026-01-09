@@ -97,9 +97,8 @@ export async function sendWelcomeEmail(
         
         ${nextSteps}
         
-        <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Important:</strong> SPhoto is a budget service without backups. 
-          Please create your own backups!
+        <p style="background: #e0f2fe; padding: 10px; border-radius: 4px; font-size: 14px;">
+          💡 <strong>Tip:</strong> We recommend keeping your own backups of your most important photos for extra safety.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
@@ -198,9 +197,8 @@ export async function sendWelcomeEmailShared(
         
         ${mlNote}
         
-        <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Important:</strong> SPhoto is a budget service without backups. 
-          Please create your own backups!
+        <p style="background: #e0f2fe; padding: 10px; border-radius: 4px; font-size: 14px;">
+          💡 <strong>Tip:</strong> We recommend keeping your own backups of your most important photos for extra safety.
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
@@ -502,7 +500,8 @@ export async function sendExportReadyEmail(
   email: string,
   instanceId: string,
   downloadUrl: string,
-  fileSizeBytes: number
+  fileSizeBytes: number,
+  sha256?: string
 ): Promise<void> {
   const resend = getResend();
   if (!resend) {
@@ -517,6 +516,15 @@ export async function sendExportReadyEmail(
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
+
+  const checksumSection = sha256 
+    ? `
+        <div style="background: #f3f4f6; padding: 12px; border-radius: 4px; margin: 15px 0; font-family: monospace; font-size: 12px;">
+          <p style="margin: 0 0 5px 0; font-family: -apple-system, sans-serif;"><strong>SHA256 Checksum:</strong></p>
+          <code style="word-break: break-all;">${sha256}</code>
+        </div>
+      `
+    : '';
 
   const { error } = await resend.emails.send({
     from: env.EMAIL_FROM,
@@ -535,8 +543,10 @@ export async function sendExportReadyEmail(
           <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">📦 Export details:</p>
           <p style="margin: 5px 0;"><strong>Instance:</strong> ${instanceId}</p>
           <p style="margin: 5px 0;"><strong>Size:</strong> ${formatBytes(fileSizeBytes)}</p>
-          <p style="margin: 5px 0;"><strong>Valid for:</strong> 24 hours</p>
+          <p style="margin: 5px 0;"><strong>Valid for:</strong> 48 hours</p>
         </div>
+        
+        ${checksumSection}
         
         <div style="text-align: center; margin: 30px 0;">
           <a href="${downloadUrl}" 
@@ -546,9 +556,16 @@ export async function sendExportReadyEmail(
         </div>
         
         <p style="background: #fef3c7; padding: 10px; border-radius: 4px; font-size: 14px;">
-          ⚠️ <strong>Important:</strong> The download link is only valid for 24 hours. 
+          ⚠️ <strong>Important:</strong> The download link is only valid for 48 hours. 
           After that, the file will be automatically deleted.
         </p>
+        
+        ${sha256 ? `
+        <p style="font-size: 12px; color: #666; margin-top: 15px;">
+          💡 <strong>Verify your download:</strong> You can verify the integrity of your downloaded file by running:<br>
+          <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">shasum -a 256 your-download.zip</code>
+        </p>
+        ` : ''}
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
           This export was created in accordance with GDPR Art. 20 (Right to data portability).

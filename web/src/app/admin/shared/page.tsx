@@ -42,6 +42,7 @@ import {
   Filter,
   HardDrive,
   ImageIcon,
+  Inbox,
   Loader2,
   LogOut,
   Mail,
@@ -59,6 +60,7 @@ import {
   Video,
   XCircle,
 } from "lucide-react"
+import { SkeletonTable, Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -731,8 +733,13 @@ export default function SharedAdminPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-muted/50">
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -945,12 +952,18 @@ export default function SharedAdminPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
+              <SkeletonTable rows={5} columns={8} />
             ) : sortedUsers.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                {users.length === 0 ? "No users yet" : "No users match your filters"}
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Inbox className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium">
+                  {users.length === 0 ? "Noch keine Benutzer" : "Keine Benutzer gefunden"}
+                </p>
+                <p className="text-sm mt-1">
+                  {users.length === 0 
+                    ? "Neue Benutzer erscheinen hier automatisch nach der Registrierung." 
+                    : "Versuche andere Filter oder Suchbegriffe."}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">

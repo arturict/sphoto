@@ -622,7 +622,7 @@ app.get('/portal/export', portalAuth, async (req: Request, res: Response) => {
   // Send email notification if just completed and not yet notified
   if (job.status === 'completed' && downloadUrl && !job.notified) {
     try {
-      await sendExportReadyEmail(user.email, user.visibleId, downloadUrl, job.fileSize || 0);
+      await sendExportReadyEmail(user.email, user.visibleId, downloadUrl, job.fileSize || 0, job.sha256);
       (job as any).notified = true;
     } catch (err) {
       console.error('Failed to send export email:', err);
@@ -1650,7 +1650,7 @@ app.post('/api/instances/:id/export/:jobId/notify', adminAuth, async (req: Reque
     }
     
     const downloadUrl = `https://api.${env.DOMAIN}/api/exports/${job.downloadToken}`;
-    await sendExportReadyEmail(instance.email, instance.id, downloadUrl, job.fileSize || 0);
+    await sendExportReadyEmail(instance.email, instance.id, downloadUrl, job.fileSize || 0, job.sha256);
     
     res.json({ success: true });
   } catch (err) {
