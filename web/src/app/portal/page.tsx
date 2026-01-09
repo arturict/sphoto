@@ -86,6 +86,15 @@ interface ExportJob {
   error?: string
 }
 
+interface UpgradePreview {
+  immediateCharge: number
+  nextBillingAmount: number
+  nextBillingDate: string
+  currency: string
+  currentPlan: string
+  newPlan: string
+}
+
 // Helper function to format relative time
 function formatMemberSince(dateString: string): string {
   const date = new Date(dateString)
@@ -151,6 +160,8 @@ function PortalContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [exportJob, setExportJob] = useState<ExportJob | null>(null)
+  const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
   const fetchDashboard = useCallback(async (authToken: string) => {
     try {
@@ -190,6 +201,22 @@ function PortalContent() {
       }
     } catch {
       // Silently ignore export status errors
+    }
+  }, [])
+
+  const fetchUpgradePreview = useCallback(async (authToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/portal/upgrade-preview`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success) {
+          setUpgradePreview(result.preview)
+        }
+      }
+    } catch {
+      // Silently ignore preview errors
     }
   }, [])
 
@@ -250,6 +277,14 @@ function PortalContent() {
     
     return () => clearInterval(interval)
   }, [token, exportJob?.hasExport, exportJob?.status, fetchExportStatus])
+
+  // Fetch upgrade preview for Basic users
+  useEffect(() => {
+    if (!token || !data) return
+    if (data.tier === "basic") {
+      fetchUpgradePreview(token)
+    }
+  }, [token, data, fetchUpgradePreview])
 
   async function handleLogout() {
     if (!token) return
@@ -820,21 +855,80 @@ function PortalContent() {
                     <p className="text-sm text-muted-foreground mt-1">
                       Erweitere auf 1 TB Speicher und erhalte Prioritäts-Support für nur CHF 10 mehr pro Monat.
                     </p>
-                  </div>
-                  <Button 
-                    className="btn-cta h-11 px-6 cursor-pointer shrink-0" 
-                    onClick={() => handleUpgrade("pro")}
-                    disabled={actionLoading?.startsWith("upgrade")}
-                  >
-                    {actionLoading === "upgrade-pro" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Auf Pro upgraden
-                      </>
+                    {upgradePreview && upgradePreview.immediateCharge > 0 && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Anteiliger Sofortbetrag: <span className="font-medium text-foreground">CHF {upgradePreview.immediateCharge.toFixed(2)}</span> (wird heute verrechnet)
+                      </p>
                     )}
-                  </Button>
+                  </div>
+                  <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        className="btn-cta h-11 px-6 cursor-pointer shrink-0" 
+                        disabled={actionLoading?.startsWith("upgrade")}
+                      >
+                        {actionLoading === "upgrade-pro" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Auf Pro upgraden
+                          </>
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Upgrade auf Pro bestätigen</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                          <div className="space-y-4">
+                            <p>Du erhältst sofort Zugang zu 1 TB Speicherplatz und allen Pro-Features.</p>
+                            
+                            {upgradePreview ? (
+                              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                                {upgradePreview.immediateCharge > 0 && (
+                                  <div className="flex justify-between text-sm">
+                                    <span>Sofortiger Betrag (anteilig):</span>
+                                    <span className="font-medium">CHF {upgradePreview.immediateCharge.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-sm">
+                                  <span>Nächste Rechnung:</span>
+                                  <span className="font-medium">CHF {upgradePreview.nextBillingAmount.toFixed(2)}/Monat</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-muted-foreground">
+                                  <span>Nächste Zahlung am:</span>
+                                  <span>{formatDate(upgradePreview.nextBillingDate)}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-muted/50 rounded-lg p-4">
+                                <div className="flex justify-between text-sm">
+                                  <span>Pro-Plan:</span>
+                                  <span className="font-medium">CHF 15.00/Monat</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Der anteilige Betrag wird automatisch berechnet.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => {
+                            setShowUpgradeDialog(false)
+                            handleUpgrade("pro")
+                          }}
+                          className="btn-cta"
+                        >
+                          Jetzt upgraden
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
                   <div className="flex items-center gap-2 text-sm">

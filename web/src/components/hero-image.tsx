@@ -4,6 +4,34 @@ import { motion } from "framer-motion"
 import { ImmichSidebar } from "./immich-sidebar"
 import { ImmichTopBar } from "./immich-topbar"
 
+// Generate deterministic colors based on seed for consistent "photos"
+function getPhotoGradient(seed: number): string {
+  const gradients = [
+    'from-blue-600/40 to-purple-600/40',    // Sunset sky
+    'from-green-600/40 to-teal-600/40',     // Nature
+    'from-orange-500/40 to-red-500/40',     // Warm sunset
+    'from-cyan-500/40 to-blue-500/40',      // Ocean
+    'from-pink-500/40 to-rose-500/40',      // Flowers
+    'from-amber-500/40 to-yellow-500/40',   // Golden hour
+    'from-indigo-500/40 to-violet-500/40',  // Twilight
+    'from-emerald-500/40 to-green-500/40',  // Forest
+    'from-sky-500/40 to-cyan-500/40',       // Clear sky
+    'from-fuchsia-500/40 to-pink-500/40',   // Vibrant
+  ]
+  return gradients[seed % gradients.length]
+}
+
+// Simulated photo placeholder component
+function PhotoPlaceholder({ seed, className = "" }: { seed: number; className?: string }) {
+  const gradient = getPhotoGradient(seed)
+  return (
+    <div className={`bg-gradient-to-br ${gradient} ${className}`}>
+      {/* Subtle noise texture overlay */}
+      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_70%)]" />
+    </div>
+  )
+}
+
 export function HeroImage() {
   // Generate random data for the dense grid
   const gridRows = [
@@ -32,13 +60,11 @@ export function HeroImage() {
             <div className="flex gap-4 mb-10 overflow-x-hidden">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="min-w-[280px] h-44 rounded-xl relative overflow-hidden group cursor-pointer border border-white/5">
-                  <div className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10`} />
-                  <div className={`absolute inset-0 bg-white/5 animate-pulse`} />
-                  {/* Simulated Images */}
-                  <img
-                    src={`https://picsum.photos/seed/${i * 123}/600/400`}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
-                    alt="memory"
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
+                  {/* CSS-based photo placeholder */}
+                  <PhotoPlaceholder 
+                    seed={i * 123} 
+                    className="absolute inset-0 w-full h-full group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute bottom-4 left-4 z-20">
                     <div className="text-[10px] text-white/60 font-medium">{i} year{i > 1 ? 's' : ''} ago</div>
@@ -62,12 +88,11 @@ export function HeroImage() {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 + (i * 0.05), duration: 0.4 }}
-                      className="aspect-square bg-white/5 rounded-[2px] overflow-hidden relative group cursor-pointer"
+                      className="aspect-square rounded-[2px] overflow-hidden relative group cursor-pointer"
                     >
-                      <img
-                        src={`https://picsum.photos/seed/${(rowIndex * 50) + i}/200/200`}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 opacity-80"
-                        alt="gallery"
+                      <PhotoPlaceholder 
+                        seed={(rowIndex * 50) + i} 
+                        className="w-full h-full group-hover:scale-110 transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </motion.div>

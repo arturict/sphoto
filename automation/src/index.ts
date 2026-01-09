@@ -517,6 +517,74 @@ app.post('/portal/upgrade', portalAuth, async (req: Request, res: Response) => {
   return res.status(400).json({ error: 'Invalid upgrade path' });
 });
 
+// Preview upgrade proration (shows what user will pay)
+app.get('/portal/upgrade-preview', portalAuth, async (req: Request, res: Response) => {
+  const user = (req as any).portalUser;
+  
+  // Only Basic users can preview upgrade to Pro
+  if (user.tier !== 'basic') {
+    return res.status(400).json({ error: 'Proration preview only available for Basic tier' });
+  }
+  
+  const stripe = getStripe();
+  if (!stripe) {
+    return res.status(501).json({ error: 'Stripe not configured' });
+  }
+  
+  if (!user.stripeSubscriptionId) {
+    return res.status(400).json({ error: 'No active subscription found' });
+  }
+  
+  try {
+    // Get current subscription
+    const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+    const subscriptionItemId = subscription.items.data[0]?.id;
+    
+    if (!subscriptionItemId) {
+      return res.status(500).json({ error: 'Could not find subscription item' });
+    }
+    
+    // Preview the proration using upcoming invoice
+    const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+      customer: subscription.customer as string,
+      subscription: user.stripeSubscriptionId,
+      subscription_items: [{
+        id: subscriptionItemId,
+        price: env.STRIPE_PRICE_PRO,
+      }],
+      subscription_proration_behavior: 'create_prorations',
+    });
+    
+    // Find the proration line items
+    const prorationItems = upcomingInvoice.lines.data.filter(
+      line => line.proration
+    );
+    
+    // Calculate the immediate charge (proration amount)
+    const prorationAmount = prorationItems.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Get next billing amount (full Pro price)
+    const nextBillingAmount = upcomingInvoice.lines.data
+      .filter(line => !line.proration)
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    return res.json({
+      success: true,
+      preview: {
+        immediateCharge: prorationAmount / 100, // Convert from cents to CHF
+        nextBillingAmount: nextBillingAmount / 100,
+        nextBillingDate: new Date((subscription.current_period_end || 0) * 1000).toISOString(),
+        currency: upcomingInvoice.currency?.toUpperCase() || 'CHF',
+        currentPlan: 'Basic',
+        newPlan: 'Pro',
+      }
+    });
+  } catch (err) {
+    console.error('Proration preview error:', err);
+    return res.status(500).json({ error: 'Failed to preview upgrade' });
+  }
+});
+
 // =============================================================================
 // Portal Export API
 // =============================================================================
