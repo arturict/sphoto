@@ -40,7 +40,10 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Webhook signature verification failed');
+    console.error('Webhook signature verification failed:', (err as Error).message);
+    console.error('Signature header:', sig?.substring(0, 50) + '...');
+    console.error('Secret used:', env.STRIPE_WEBHOOK_SECRET?.substring(0, 15) + '...');
+    console.error('Body type:', typeof req.body, 'isBuffer:', Buffer.isBuffer(req.body));
     res.status(400).send('Webhook Error');
     return;
   }
