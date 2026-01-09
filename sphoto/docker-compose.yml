@@ -78,6 +78,11 @@ services:
       - ADMIN_API_KEY=${ADMIN_API_KEY}
       - IMMICH_VERSION=${IMMICH_VERSION:-release}
       - EXTERNAL_STORAGE_PATH=${EXTERNAL_STORAGE_PATH:-}
+      # Shared instance configuration
+      - SHARED_FREE_API_KEY=${SHARED_FREE_API_KEY}
+      - SHARED_PAID_API_KEY=${SHARED_PAID_API_KEY}
+      - SHARED_FREE_INTERNAL_URL=${SHARED_FREE_INTERNAL_URL:-http://sphoto-free-server:2283}
+      - SHARED_PAID_INTERNAL_URL=${SHARED_PAID_INTERNAL_URL:-http://sphoto-paid-server:2283}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/instances:/data/instances
