@@ -33,6 +33,7 @@ services:
       - "traefik.http.routers.sphoto-paid.rule=Host(`photos.${DOMAIN}`)"
       - "traefik.http.routers.sphoto-paid.entrypoints=websecure"
       - "traefik.http.routers.sphoto-paid.tls.certresolver=le"
+      - "traefik.http.routers.sphoto-paid.middlewares=portal-button@file"
       - "traefik.http.services.sphoto-paid.loadbalancer.server.port=2283"
 
   db:

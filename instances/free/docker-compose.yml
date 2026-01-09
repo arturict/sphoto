@@ -33,6 +33,7 @@ services:
       - "traefik.http.routers.sphoto-free.rule=Host(`free.${DOMAIN}`)"
       - "traefik.http.routers.sphoto-free.entrypoints=websecure"
       - "traefik.http.routers.sphoto-free.tls.certresolver=le"
+      - "traefik.http.routers.sphoto-free.middlewares=portal-button@file"
       - "traefik.http.services.sphoto-free.loadbalancer.server.port=2283"
 
   db:

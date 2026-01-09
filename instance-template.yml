@@ -25,6 +25,7 @@ services:
       - "traefik.http.routers.{{ID}}.rule=Host(`{{ID}}.{{DOMAIN}}`)"
       - "traefik.http.routers.{{ID}}.entrypoints=websecure"
       - "traefik.http.routers.{{ID}}.tls.certresolver=le"
+      - "traefik.http.routers.{{ID}}.middlewares=portal-button@file"
       - "traefik.http.services.{{ID}}.loadbalancer.server.port=2283"
 
   db:

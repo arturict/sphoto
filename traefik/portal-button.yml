@@ -1,0 +1,57 @@
+# =============================================================================
+# Portal Button Injection Middleware
+# Injects a floating "Portal" button into Immich pages
+# =============================================================================
+
+http:
+  middlewares:
+    portal-button:
+      plugin:
+        rewritebody:
+          lastModified: true
+          rewrites:
+            - regex: "</body>"
+              replacement: |
+                <!-- SPhoto Portal Button -->
+                <div id="sphoto-portal-btn" style="
+                  position: fixed;
+                  bottom: 20px;
+                  right: 20px;
+                  z-index: 99999;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                ">
+                  <a href="https://sphoto.ferreiracruz.com/portal" 
+                     target="_blank"
+                     style="
+                       display: flex;
+                       align-items: center;
+                       gap: 8px;
+                       padding: 12px 20px;
+                       background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+                       color: white;
+                       text-decoration: none;
+                       border-radius: 50px;
+                       font-weight: 600;
+                       font-size: 14px;
+                       box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+                       transition: all 0.3s ease;
+                     "
+                     onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(59, 130, 246, 0.5)';"
+                     onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(59, 130, 246, 0.4)';"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                      <polyline points="10 17 15 12 10 7"/>
+                      <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    Portal
+                  </a>
+                </div>
+                <script>
+                  // Hide portal button on login page
+                  if (window.location.pathname === '/auth/login' || window.location.pathname === '/') {
+                    var btn = document.getElementById('sphoto-portal-btn');
+                    if (btn) btn.style.display = 'none';
+                  }
+                </script>
+                </body>
