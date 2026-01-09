@@ -206,3 +206,48 @@ curl https://api.sphoto.arturf.ch/health
 - [Bun Runtime](https://bun.sh/docs)
 - `README.md` — Quick-start guide and architecture overview
 - `.env.example` — Full list of environment variables with comments
+
+## btca
+
+Use btca (Bun TypeScript Codebase Assistant) for codebase/docs questions when the user says "use btca".
+
+### Quick Reference
+
+```bash
+# Ask a single question
+btca ask -r <resource> -q "<question>"
+
+# Interactive TUI session
+btca chat -r <resource>
+
+# List configured resources
+btca config resources list
+
+# Add a new resource
+btca config resources add -n <name> -t git -u <repo-url> -b <branch>
+
+# Set AI model
+btca config model -p <provider> -m <model>
+```
+
+### Available Resources
+
+- `svelte` - Svelte framework docs
+- `tailwindcss` - Tailwind CSS docs
+- `immich` - Immich photo server docs
+
+### Adding New Resources
+
+To add a git repository as a resource:
+
+```bash
+btca config resources add -n <name> -t git -u https://github.com/org/repo -b main
+```
+
+### Installation
+
+If btca is not installed:
+
+```bash
+bun add -g btca opencode-ai && btca
+```

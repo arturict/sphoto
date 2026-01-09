@@ -375,28 +375,49 @@ async function processSharedUserExport(
   await mkdir(assetsDir, { recursive: true });
   
   try {
-    // Step 1: Get all assets for this user
-    // Using search endpoint to get user's assets
-    const searchResult = await immichApiCallForExport<{ assets: { items: ImmichAsset[]; total: number } }>(
-      instance,
-      '/api/search/metadata',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          ownerId: immichUserId,
-          size: 10000, // Get up to 10k assets
-          page: 1,
-        }),
-      }
-    );
+    // Step 1: Get all assets for this user with pagination
+    // Immich has a max page size of 1000, so we need to paginate
+    const PAGE_SIZE = 1000;
+    let allAssets: ImmichAsset[] = [];
+    let page = 1;
+    let hasMore = true;
 
-    if (!searchResult.ok || !searchResult.data) {
-      throw new Error(`Failed to get assets: ${searchResult.error}`);
+    console.log(`[Export] Fetching assets for ${job.email} on ${instance}...`);
+
+    while (hasMore) {
+      const searchResult = await immichApiCallForExport<{ assets: { items: ImmichAsset[]; total: number; nextPage: string | null } }>(
+        instance,
+        '/api/search/metadata',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ownerId: immichUserId,
+            size: PAGE_SIZE,
+            page: page,
+          }),
+        }
+      );
+
+      if (!searchResult.ok || !searchResult.data) {
+        throw new Error(`Failed to get assets: ${searchResult.error}`);
+      }
+
+      const pageAssets = searchResult.data.assets.items;
+      allAssets = allAssets.concat(pageAssets);
+      
+      console.log(`[Export] Page ${page}: fetched ${pageAssets.length} assets (total so far: ${allAssets.length})`);
+
+      // Check if there are more pages
+      if (pageAssets.length < PAGE_SIZE || searchResult.data.assets.nextPage === null) {
+        hasMore = false;
+      } else {
+        page++;
+      }
     }
 
-    const assets = searchResult.data.assets.items;
+    const assets = allAssets;
     job.totalAssets = assets.length;
-    console.log(`[Export] Found ${assets.length} assets for ${job.email}`);
+    console.log(`[Export] Found ${assets.length} total assets for ${job.email}`);
 
     if (assets.length === 0) {
       // No assets - create empty export with just metadata

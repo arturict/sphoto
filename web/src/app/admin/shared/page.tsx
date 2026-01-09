@@ -31,12 +31,14 @@ import {
 import {
   AlertTriangle,
   ArrowUpDown,
+  BarChart3,
   CheckCircle2,
   Clock,
   Cloud,
   Crown,
   DollarSign,
   ExternalLink,
+  Eye,
   Filter,
   HardDrive,
   ImageIcon,
@@ -193,6 +195,7 @@ export default function SharedAdminPage() {
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
   const [showRevenuePanel, setShowRevenuePanel] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<SharedUser | null>(null)
   const [filters, setFilters] = useState<{
     query: string
     tier: TierFilter
@@ -468,6 +471,12 @@ export default function SharedAdminPage() {
             <p className="text-sm text-muted-foreground">Shared Mode • {users.length} users</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link href="/admin/shared/graphs">
+              <Button variant="outline" size="sm" className="cursor-pointer">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Graphs
+              </Button>
+            </Link>
             <Link href="/admin">
               <Button variant="outline" size="sm" className="cursor-pointer">
                 <Server className="mr-2 h-4 w-4" />
@@ -1049,6 +1058,16 @@ export default function SharedAdminPage() {
                         <td className="py-3 px-2 text-muted-foreground">{formatDate(user.created)}</td>
                         <td className="py-3 px-2 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {/* View User Details */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedUser(user)}
+                              className="cursor-pointer"
+                              title="View details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             {/* Send Login Email */}
                             <Button
                               size="sm"
@@ -1119,6 +1138,161 @@ export default function SharedAdminPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* User Detail Modal */}
+        <AlertDialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                User Details
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+            {selectedUser && (
+              <div className="space-y-4">
+                {/* Basic Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="font-medium break-all">{selectedUser.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Visible ID</p>
+                    <p className="font-mono text-sm">{selectedUser.visibleId}</p>
+                  </div>
+                </div>
+
+                {/* Tier & Instance */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tier</p>
+                    <Badge className={`${tierColors[selectedUser.tier]} gap-1 mt-1`}>
+                      {tierIcons[selectedUser.tier]}
+                      {selectedUser.tier.charAt(0).toUpperCase() + selectedUser.tier.slice(1)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Instance</p>
+                    <Badge variant="outline" className="mt-1">{selectedUser.instance}</Badge>
+                  </div>
+                </div>
+
+                {/* Storage */}
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <HardDrive className="h-3 w-3" />
+                      Storage
+                    </span>
+                    <span className="text-sm font-medium">
+                      {selectedUser.stats ? formatBytes(selectedUser.stats.usedBytes) : "0 B"} / {selectedUser.quotaGB} GB
+                    </span>
+                  </div>
+                  {selectedUser.stats && (
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all"
+                        style={{ 
+                          width: `${Math.min((selectedUser.stats.usedBytes / (selectedUser.quotaGB * 1024 * 1024 * 1024)) * 100, 100)}%` 
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Media Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm text-muted-foreground">Photos</span>
+                    </div>
+                    <p className="text-xl font-semibold mt-1">
+                      {selectedUser.stats?.photos?.toLocaleString() ?? 0}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <Video className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm text-muted-foreground">Videos</span>
+                    </div>
+                    <p className="text-xl font-semibold mt-1">
+                      {selectedUser.stats?.videos?.toLocaleString() ?? 0}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status & Dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <Badge className={`${statusColors[selectedUser.status]} mt-1`}>
+                      {selectedUser.status === "active"
+                        ? "Active"
+                        : selectedUser.status === "pending_deletion"
+                        ? "Pending Delete"
+                        : "Deleted"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Created</p>
+                    <p className="text-sm mt-1">{formatDate(selectedUser.created)}</p>
+                  </div>
+                </div>
+
+                {/* Deletion Info */}
+                {selectedUser.deletionScheduledFor && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Deletion scheduled for {formatDate(selectedUser.deletionScheduledFor)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Stripe Info */}
+                {selectedUser.stripeCustomerId && (
+                  <div className="pt-3 border-t">
+                    <p className="text-xs text-muted-foreground mb-2">Stripe</p>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`https://dashboard.stripe.com/customers/${selectedUser.stripeCustomerId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                        View Customer
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      {selectedUser.stripeSubscriptionId && (
+                        <a
+                          href={`https://dashboard.stripe.com/subscriptions/${selectedUser.stripeSubscriptionId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-primary hover:underline flex items-center gap-1"
+                        >
+                          <TrendingUp className="h-3 w-3" />
+                          View Subscription
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Immich User ID */}
+                <div className="pt-3 border-t">
+                  <p className="text-xs text-muted-foreground">Immich User ID</p>
+                  <p className="font-mono text-xs text-muted-foreground break-all">{selectedUser.immichUserId}</p>
+                </div>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel className="cursor-pointer">Close</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
