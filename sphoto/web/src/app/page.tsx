@@ -13,6 +13,7 @@ import {
   FileText,
   FolderSync,
   HardDrive,
+  Loader2,
   Mail,
   Search,
   Shield,
@@ -30,8 +31,8 @@ import { HeroImage } from '@/components/hero-image'
 import { GridPattern } from '@/components/ui/background-pattern'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.sphoto.arturf.ch'
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'sphoto.arturf.ch'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost'
 
 type Platform = 'immich' | 'nextcloud'
 
@@ -194,21 +195,48 @@ function isEmail(value: string) {
 export default function Home() {
   const [email, setEmail] = useState('')
   const [platform, setPlatform] = useState<Platform>('immich')
+  const [checkingEmail, setCheckingEmail] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const validEmail = useMemo(() => isEmail(email), [email])
 
   const features = platform === 'immich' ? immichFeatures : nextcloudFeatures
   const faqs = platform === 'immich' ? immichFaqs : nextcloudFaqs
   const visiblePlans = platform === 'immich' ? plans : plans.filter(p => !p.immichOnly)
 
-  const handleCheckout = (planId: Plan['id']) => {
+  const handleCheckout = async (planId: Plan['id']) => {
     if (!validEmail) return
+    
+    setCheckingEmail(true)
+    setEmailError(null)
+    
+    try {
+      // Check if email is already registered before going to checkout
+      const checkResponse = await fetch(`${API_URL}/check-email?email=${encodeURIComponent(email)}`)
+      const checkResult = await checkResponse.json()
+      
+      if (!checkResult.available) {
+        setEmailError(checkResult.reason || 'This email is already registered.')
+        setCheckingEmail(false)
+        return
+      }
+      
+      // Email is available, proceed to checkout
+      const url =
+        planId === 'free'
+          ? `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
+          : `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}&platform=${platform}`
 
-    const url =
-      planId === 'free'
-        ? `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
-        : `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}&platform=${platform}`
+      window.location.href = url
+    } catch (err) {
+      console.error('Error checking email:', err)
+      // On error, proceed anyway (server will handle validation)
+      const url =
+        planId === 'free'
+          ? `${API_URL}/signup/free?email=${encodeURIComponent(email)}`
+          : `${API_URL}/checkout/${planId}?email=${encodeURIComponent(email)}&platform=${platform}`
 
-    window.location.href = url
+      window.location.href = url
+    }
   }
 
   return (
@@ -486,7 +514,10 @@ export default function Home() {
                   type="email"
                   placeholder="your@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                  onChange={(e) => {
+                    setEmail(e.target.value.toLowerCase())
+                    setEmailError(null) // Clear error when email changes
+                  }}
                   className="pl-12 h-14 text-base bg-background"
                 />
                 {email && (
@@ -501,6 +532,9 @@ export default function Home() {
               </div>
               {email && !validEmail && (
                 <p className="mt-3 text-sm text-destructive">Please enter a valid email address.</p>
+              )}
+              {emailError && (
+                <p className="mt-3 text-sm text-destructive">{emailError}</p>
               )}
             </div>
 
@@ -541,10 +575,19 @@ export default function Home() {
                     <Button
                       className={`w-full cursor-pointer ${plan.popular ? 'btn-cta' : ''}`}
                       variant={plan.popular ? 'default' : plan.variant}
-                      disabled={!validEmail}
+                      disabled={!validEmail || checkingEmail}
                       onClick={() => handleCheckout(plan.id)}
                     >
-                      {!validEmail ? 'Enter email' : plan.cta}
+                      {checkingEmail ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : !validEmail ? (
+                        'Enter email'
+                      ) : (
+                        plan.cta
+                      )}
                     </Button>
                   </CardFooter>
                 </Card>

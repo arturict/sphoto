@@ -5,17 +5,20 @@
 import type { Plans, Env } from './types';
 
 export const env: Env = {
-  DOMAIN: process.env.DOMAIN || 'sphoto.arturf.ch',
+  DOMAIN: process.env.DOMAIN || 'localhost',
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
   STRIPE_PRICE_BASIC: process.env.STRIPE_PRICE_BASIC || '',
   STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO || '',
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  EMAIL_FROM: process.env.EMAIL_FROM || 'SPhoto <noreply@arturf.ch>',
+  EMAIL_FROM: process.env.EMAIL_FROM || 'SPhoto <noreply@sphoto.local>',
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || '',
   IMMICH_VERSION: process.env.IMMICH_VERSION || 'release',
-  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@arturf.ch',
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@sphoto.local',
 };
+
+// Support email for user communications
+export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || `support@${env.DOMAIN}`;
 
 export const INSTANCES_DIR = process.env.INSTANCES_DIR || '/data/instances';
 

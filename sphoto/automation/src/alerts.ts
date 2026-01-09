@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH } from './config';
+import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH, SUPPORT_EMAIL } from './config';
 import { getResend } from './lib/resend';
 import { listInstances, getInstance, getDirectorySize } from './instances';
 import type { InstanceMetadata } from './types';
@@ -251,7 +251,7 @@ async function sendStorageWarningEmail(
         `}
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,
@@ -304,7 +304,7 @@ async function sendInactiveReminderEmail(
         </div>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Übertrage alle deine Fotos und Videos von Google Photos zu SPhoto. Schritt-für-Schritt Anleitung.",
 }
 
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "localhost"
 
 export default function GooglePhotosMigrationPage() {
   return (

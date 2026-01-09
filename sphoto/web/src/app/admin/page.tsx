@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -23,6 +24,7 @@ import {
   ExternalLink,
   Filter,
   HardDrive,
+  Loader2,
   Mail,
   Palette,
   Play,
@@ -33,11 +35,12 @@ import {
   Square,
   SquareStack,
   Trash2,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "localhost"
 
 type Platform = "immich" | "nextcloud"
 
@@ -225,8 +228,10 @@ function StorageUsageCell({
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const [apiKey, setApiKey] = useState("")
   const [isAuthed, setIsAuthed] = useState(false)
+  const [checkingMode, setCheckingMode] = useState(true)
   const [instances, setInstances] = useState<Instance[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -252,6 +257,26 @@ export default function AdminPage() {
     field: "created",
     order: "desc",
   })
+
+  // Check deployment mode on mount - redirect to shared admin if in shared mode
+  useEffect(() => {
+    const checkDeploymentMode = async () => {
+      try {
+        const res = await fetch(`${API_URL}/health`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.deploymentMode === 'shared') {
+            router.replace('/admin/shared')
+            return
+          }
+        }
+      } catch {
+        // Fall through to siloed mode
+      }
+      setCheckingMode(false)
+    }
+    checkDeploymentMode()
+  }, [router])
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("admin_api_key") : null
@@ -575,6 +600,21 @@ export default function AdminPage() {
 
   const planOptions: PlanFilter[] = ["all", "Basic", "Pro"]
   const statusOptions: StatusFilter[] = ["all", "active", "stopped", "deleted"]
+
+  // Show loading while checking deployment mode
+  if (checkingMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 pt-6">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Detecting deployment mode...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (!isAuthed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -595,7 +635,7 @@ export default function AdminPage() {
               onKeyDown={(event) => event.key === "Enter" && handleLogin()}
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button className="w-full" onClick={handleLogin} disabled={!apiKey.trim()}>
+            <Button className="w-full cursor-pointer" onClick={handleLogin} disabled={!apiKey.trim()}>
               Anmelden
             </Button>
           </CardContent>
@@ -616,39 +656,45 @@ export default function AdminPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Link href="/admin/health">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <Activity className="mr-2 h-4 w-4" />
                 Health
               </Button>
             </Link>
             <Link href="/admin/alerts">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Alerts
               </Button>
             </Link>
             <Link href="/admin/maintenance">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <Server className="mr-2 h-4 w-4" />
                 Wartung
               </Button>
             </Link>
             <Link href="/admin/plans">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <HardDrive className="mr-2 h-4 w-4" />
                 Pläne
               </Button>
             </Link>
             <Link href="/admin/branding">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <Palette className="mr-2 h-4 w-4" />
                 Branding
               </Button>
             </Link>
             <Link href="/admin/analytics">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Analytics
+              </Button>
+            </Link>
+            <Link href="/admin/shared">
+              <Button variant="outline" size="sm" className="cursor-pointer">
+                <Users className="mr-2 h-4 w-4" />
+                Shared Mode
               </Button>
             </Link>
             <Badge variant="secondary">{instances.length} Instanzen</Badge>
@@ -667,11 +713,11 @@ export default function AdminPage() {
               />
               Auto-Refresh 15s
             </label>
-            <Button variant="outline" size="sm" onClick={() => loadInstances()} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => loadInstances()} disabled={loading} className="cursor-pointer">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Aktualisieren
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="cursor-pointer">
               Logout
             </Button>
           </div>

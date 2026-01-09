@@ -25,7 +25,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "localhost"
 
 interface HealthStatus {
   instanceId: string
@@ -286,7 +287,7 @@ export default function HealthPage() {
                         </div>
                       </div>
                       <a 
-                        href={`https://${status.instanceId}.sphoto.arturf.ch`}
+                        href={`https://${status.instanceId}.${DOMAIN}`}
                         target="_blank"
                         rel="noreferrer"
                         className="text-sm text-primary hover:underline"

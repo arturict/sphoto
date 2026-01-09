@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH, PLANS } from './config';
+import { env, INSTANCES_DIR, EXTERNAL_STORAGE_PATH, PLANS, SUPPORT_EMAIL } from './config';
 import { getInstance, getDirectorySize } from './instances';
 import { getStripe, isStripeConfigured } from './lib/stripe';
 import { getResend, isResendConfigured } from './lib/resend';
@@ -172,7 +172,7 @@ async function sendUpgradeConfirmationEmail(
         <p>Die Änderung ist sofort wirksam. Du kannst jetzt mehr Fotos und Videos hochladen!</p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,
@@ -221,7 +221,7 @@ async function sendDowngradeConfirmationEmail(
         <p>Die Änderung wird zum Ende deines aktuellen Abrechnungszeitraums wirksam.</p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,

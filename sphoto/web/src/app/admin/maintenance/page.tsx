@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 type MaintenanceType = "update" | "backup" | "migration" | "emergency"
 type MaintenanceStatus = "scheduled" | "in_progress" | "completed" | "cancelled"

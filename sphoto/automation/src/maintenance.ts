@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { env, INSTANCES_DIR } from './config';
+import { env, INSTANCES_DIR, SUPPORT_EMAIL } from './config';
 import { getResend } from './lib/resend';
 import { listInstances, getInstance } from './instances';
 import type { InstanceMetadata } from './types';
@@ -170,7 +170,7 @@ async function sendMaintenanceScheduledEmail(
         ` : ''}
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,
@@ -213,7 +213,7 @@ async function sendMaintenanceReminderEmail(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,
@@ -255,7 +255,7 @@ async function sendMaintenanceStartedEmail(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,
@@ -296,7 +296,7 @@ async function sendMaintenanceCompletedEmail(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Bei Fragen: support@arturf.ch
+          Bei Fragen: ${SUPPORT_EMAIL}
         </p>
       </div>
     `,

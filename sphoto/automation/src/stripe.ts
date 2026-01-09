@@ -90,7 +90,7 @@ async function handleWebhookShared(stripe: Stripe, event: Stripe.Event, res: Res
           const tier: UserTier = plan.name.toLowerCase() === 'pro' ? 'pro' : 'basic';
           
           console.log(`Creating paid user ${customerEmail} with ${plan.storage}GB quota`);
-          sessionStatus.set(sessionId, { status: 'processing', message: 'Erstelle Account auf photos.sphoto.arturf.ch...' });
+          sessionStatus.set(sessionId, { status: 'processing', message: `Creating account on ${SHARED_INSTANCES.paid.url}...` });
           
           const result = await createSharedUser(customerEmail, tier, plan.storage);
           
@@ -350,7 +350,8 @@ export async function getSessionStatus(sessionId: string): Promise<SessionStatus
 export async function createCheckoutSession(
   plan: 'basic' | 'pro', 
   subdomain?: string,
-  platform: Platform = 'immich'
+  platform: Platform = 'immich',
+  customerEmail?: string
 ): Promise<string> {
   const stripe = getStripe();
   if (!stripe) {
@@ -385,6 +386,8 @@ export async function createCheckoutSession(
     success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: baseUrl,
     metadata,
+    // Pre-fill customer email if provided
+    ...(customerEmail && { customer_email: customerEmail }),
   });
   
   return session.url!;

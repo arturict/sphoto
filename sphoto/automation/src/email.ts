@@ -2,7 +2,7 @@
 // Email Service
 // =============================================================================
 
-import { env, SHARED_INSTANCES } from './config';
+import { env, SHARED_INSTANCES, SUPPORT_EMAIL } from './config';
 import { getResend, isResendConfigured } from './lib/resend';
 import type { Platform } from './types';
 
@@ -103,7 +103,7 @@ export async function sendWelcomeEmail(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Questions? Contact support@arturf.ch
+          Questions? Contact ${SUPPORT_EMAIL}
         </p>
       </div>
     `
@@ -204,7 +204,7 @@ export async function sendWelcomeEmailShared(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Questions? Contact support@arturf.ch
+          Questions? Contact ${SUPPORT_EMAIL}
         </p>
       </div>
     `
@@ -273,7 +273,7 @@ export async function sendPlanChangeEmail(
         `}
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Questions? Contact support@arturf.ch
+          Questions? Contact ${SUPPORT_EMAIL}
         </p>
       </div>
     `
@@ -491,7 +491,7 @@ export async function sendAccountDeletionEmail(
         </p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Questions? Contact support@arturf.ch
+          Questions? Contact ${SUPPORT_EMAIL}
         </p>
       </div>
     `
@@ -533,7 +533,7 @@ export async function sendAccountDeletionCancelledEmail(
         <p>You can continue using SPhoto as usual.</p>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px;">
-          Questions? Contact support@arturf.ch
+          Questions? Contact ${SUPPORT_EMAIL}
         </p>
       </div>
     `

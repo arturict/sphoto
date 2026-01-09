@@ -22,7 +22,7 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.{{ID}}.rule=Host(`{{ID}}.sphoto.arturf.ch`)"
+      - "traefik.http.routers.{{ID}}.rule=Host(`{{ID}}.{{DOMAIN}}`)"
       - "traefik.http.routers.{{ID}}.entrypoints=websecure"
       - "traefik.http.routers.{{ID}}.tls.certresolver=le"
       - "traefik.http.services.{{ID}}.loadbalancer.server.port=2283"

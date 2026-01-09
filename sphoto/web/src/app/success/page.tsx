@@ -19,8 +19,8 @@ import {
   ArrowRight,
 } from "lucide-react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.sphoto.arturf.ch"
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sphoto.arturf.ch"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "localhost"
 
 type Platform = "immich" | "nextcloud"
 

@@ -302,7 +302,7 @@ app.post('/portal/login', async (req: Request, res: Response) => {
 
   // TODO: Send magic link email
   // For now, return token directly (development mode)
-  // In production, send email with: https://portal.sphoto.arturf.ch/auth?token=xxx
+  // In production, send email with: https://portal.${env.DOMAIN}/auth?token=xxx
   
   // Send magic link email
   const { sendPortalLoginEmail } = await import('./email');
@@ -426,28 +426,71 @@ app.get('/subdomain/check/:subdomain', (req: Request, res: Response) => {
 });
 
 // =============================================================================
+// Email Check API (check if email already registered before checkout)
+// =============================================================================
+app.get('/check-email', (req: Request, res: Response) => {
+  const email = (req.query.email as string)?.toLowerCase();
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  
+  // Check if email already exists (only relevant in shared mode)
+  if (DEPLOYMENT_MODE === 'shared') {
+    const existing = getSharedUserByEmail(email);
+    if (existing) {
+      return res.json({ 
+        available: false, 
+        reason: 'This email is already registered. Please log in to your account.',
+        loginUrl: `https://portal.${env.DOMAIN}`,
+      });
+    }
+  }
+  
+  res.json({ available: true });
+});
+
+// =============================================================================
 // Checkout
 // =============================================================================
 app.get('/checkout/:plan', async (req: Request, res: Response) => {
   const plan = req.params.plan as 'basic' | 'pro';
   const subdomain = (req.query.subdomain as string)?.toLowerCase();
+  const email = (req.query.email as string)?.toLowerCase();
   const platform = (req.query.platform as 'immich' | 'nextcloud') || 'immich';
   
   // Validate platform
   if (!['immich', 'nextcloud'].includes(platform)) {
-    return res.status(400).send('Ungültige Plattform');
+    return res.status(400).send('Invalid platform');
+  }
+  
+  // Validate email is provided
+  if (!email) {
+    return res.status(400).send('Email is required');
+  }
+  
+  // Check if email already exists (in shared mode)
+  if (DEPLOYMENT_MODE === 'shared') {
+    const existing = getSharedUserByEmail(email);
+    if (existing) {
+      // Redirect to error page instead of letting them pay
+      const errorUrl = IS_LOCAL_DEV
+        ? `http://localhost:3000/checkout-error?reason=email_exists&email=${encodeURIComponent(email)}`
+        : `https://${env.DOMAIN}/checkout-error?reason=email_exists&email=${encodeURIComponent(email)}`;
+      return res.redirect(303, errorUrl);
+    }
   }
   
   // Validate subdomain if provided
   if (subdomain) {
     const subdomainCheck = checkSubdomain(subdomain);
     if (!subdomainCheck.available) {
-      return res.status(400).send(subdomainCheck.reason || 'Subdomain nicht verfügbar');
+      return res.status(400).send(subdomainCheck.reason || 'Subdomain not available');
     }
   }
   
   try {
-    const url = await createCheckoutSession(plan, subdomain, platform);
+    const url = await createCheckoutSession(plan, subdomain, platform, email);
     res.redirect(303, url);
   } catch (err) {
     console.error('Checkout error:', err);
