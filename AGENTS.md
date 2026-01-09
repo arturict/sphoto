@@ -145,7 +145,60 @@ curl https://api.sphoto.arturf.ch/health
 
 ## Testing Strategy
 
-> TODO: Add unit tests for automation server (use `bun test`).
+The automation server has comprehensive unit tests using Bun's built-in test runner.
+
+### Running Tests
+
+```bash
+# Run all tests
+cd automation && bun test
+
+# Run tests in watch mode (re-runs on file changes)
+cd automation && bun test --watch
+
+# Run a specific test file
+cd automation && bun test src/__tests__/utils.test.ts
+
+# Run tests with coverage (if needed)
+cd automation && bun test --coverage
+```
+
+### Test Structure
+
+Tests are located in `automation/src/__tests__/`:
+
+| File                  | Tests                                          |
+|-----------------------|------------------------------------------------|
+| `utils.test.ts`       | Utility functions (formatBytes, generatePassword, etc.) |
+| `subdomain.test.ts`   | Subdomain validation and reserved names        |
+| `config.test.ts`      | Configuration and environment parsing          |
+| `messages.test.ts`    | Centralized German messages                    |
+
+### Writing New Tests
+
+When adding new functionality, create corresponding tests:
+
+```typescript
+// automation/src/__tests__/myfeature.test.ts
+import { describe, expect, test } from 'bun:test';
+import { myFunction } from '../mymodule';
+
+describe('myFunction', () => {
+  test('does something', () => {
+    expect(myFunction()).toBe(expectedValue);
+  });
+});
+```
+
+### Code Quality Commands
+
+```bash
+# Full quality check (run before committing)
+cd automation && bun test && bun run typecheck
+
+# Web app checks
+cd web && bun run lint && bun run build
+```
 
 | Layer       | Tool          | Command            | Notes                                   |
 |-------------|---------------|--------------------|-----------------------------------------|
