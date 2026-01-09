@@ -1,174 +1,131 @@
-<p align="center">
-  <h1 align="center">📸 SPhoto</h1>
-  <h3 align="center">Managed Photo Cloud Platform</h3>
-  <p align="center">
-    <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=for-the-badge" alt="License: AGPLv3"></a>
-    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
-    <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
-  </p>
-</p>
+# SPhoto - Self-Hosted Photo Cloud
 
----
+Self-hosted photo storage based on [Immich](https://github.com/immich-app/immich).
 
-SPhoto is a **managed multi-tenant photo cloud platform** built on top of [Immich](https://immich.app). It provides automated instance provisioning, Stripe billing integration, and a modern admin dashboard.
+## Plans
 
-## ✨ Features
+| Plan | Storage | Price | ML Features |
+|------|---------|-------|-------------|
+| Free | 5 GB | CHF 0 | - |
+| Basic | 200 GB | CHF 5/mo | Yes |
+| Pro | 1 TB | CHF 15/mo | Yes |
 
-- **🚀 Automated Instance Provisioning** - New customers get their own isolated Immich instance within seconds
-- **💳 Stripe Integration** - Subscription billing with automatic plan detection (Basic/Pro)
-- **🔐 Auto User Setup** - Admin accounts created automatically with secure passwords
-- **📧 Email Notifications** - Welcome emails via Resend with login credentials
-- **🎛️ Admin Dashboard** - Manage all instances, start/stop/delete with one click
-- **🌐 Custom Subdomains** - Each customer gets `username.yourdomain.com`
-- **📊 Storage Quotas** - Automatic quota enforcement per plan (200GB Basic / 2TB Pro)
-- **🔒 SSL/TLS** - Automatic Let's Encrypt certificates via Traefik
-- **🤖 Shared ML** - Single machine learning container for all instances
+## Quick Start
 
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Traefik (Reverse Proxy)                  │
-│                    SSL Termination + Routing                     │
-└─────────────────────────────────────────────────────────────────┘
-           │              │              │              │
-           ▼              ▼              ▼              ▼
-    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-    │   Web    │   │Automation│   │  Stats   │   │ Instance │
-    │ (Next.js)│   │  Server  │   │Dashboard │   │   1..n   │
-    └──────────┘   └──────────┘   └──────────┘   └──────────┘
-                         │                             │
-                         ▼                             ▼
-                   ┌──────────┐                 ┌──────────┐
-                   │  Stripe  │                 │Shared ML │
-                   │ Webhooks │                 │Container │
-                   └──────────┘                 └──────────┘
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Ubuntu 22.04+ Server
-- Docker & Docker Compose
-- Domain with wildcard DNS (`*.yourdomain.com`)
-- Stripe Account (Test or Live)
-- Resend Account (for emails)
-
-### Installation
+### Local Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/arturict/sphoto.git
-cd sphoto/sphoto
+# Prerequisites: Bun 1.0+, Docker
 
-# Copy and configure environment
+# 1. Setup
+./scripts/dev-setup.sh   # or: make dev-setup
+
+# 2. Start Immich containers
+make dev
+
+# 3. Start services (separate terminals)
+make web          # http://localhost:3000
+make automation   # http://localhost:3001
+```
+
+**Local URLs:**
+- Web: http://localhost:3000
+- API: http://localhost:3001
+- Free Immich: http://localhost:2283
+- Paid Immich: http://localhost:2284
+
+### Production Deployment
+
+```bash
+# 1. Clone
+git clone https://github.com/arturict/sphoto.git /opt/sphoto
+cd /opt/sphoto/sphoto
+
+# 2. Configure
 cp .env.example .env
-nano .env
+nano .env  # Fill in all values
 
-# Start the platform
-docker compose up -d
+# 3. Start shared Immich instances
+cd instances/free && cp .env.example .env && nano .env && docker compose up -d
+cd ../paid && cp .env.example .env && nano .env && docker compose up -d
 
-# Check logs
-docker compose logs -f automation
+# 4. Create admin users
+# Visit https://free.YOUR_DOMAIN and https://photos.YOUR_DOMAIN
+# Create admin accounts, generate API keys
+
+# 5. Add API keys to .env
+nano /opt/sphoto/sphoto/.env
+# SHARED_FREE_API_KEY=...
+# SHARED_PAID_API_KEY=...
+
+# 6. Start main stack
+cd /opt/sphoto/sphoto
+docker compose up -d --build
+
+# 7. Configure Stripe webhook
+# URL: https://api.YOUR_DOMAIN/webhook
+# Events: checkout.session.completed, customer.subscription.*
 ```
 
-### Environment Variables
+### Updating
 
-```env
-# Domain
-DOMAIN=sphoto.yourdomain.com
-
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_BASIC=price_...
-STRIPE_PRICE_PRO=price_...
-
-# Resend (Email)
-RESEND_API_KEY=re_...
-EMAIL_FROM=SPhoto <noreply@yourdomain.com>
-
-# Admin
-ADMIN_USER=admin
-ADMIN_PASS=your-secure-password
-ADMIN_API_KEY=your-api-key
+```bash
+cd /opt/sphoto/sphoto
+git pull
+docker compose up -d --build
 ```
 
-### Stripe Setup
+## Commands
 
-1. Create two Products in Stripe Dashboard:
-   - **Basic** - Monthly subscription (e.g., CHF 5/month)
-   - **Pro** - Monthly subscription (e.g., CHF 15/month)
-2. Copy the Price IDs to `.env`
-3. Create a Webhook endpoint: `https://api.yourdomain.com/webhook`
-4. Subscribe to events: `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`
+| Command | Description |
+|---------|-------------|
+| `make dev-setup` | First-time local setup |
+| `make dev` | Start Immich containers |
+| `make web` | Start web (port 3000) |
+| `make automation` | Start API (port 3001) |
+| `make typecheck` | TypeScript check |
+| `make lint` | ESLint |
+| `make clean` | Remove local data |
 
-## 📁 Project Structure
+## Architecture
 
 ```
-sphoto/
-├── automation/          # Automation server (TypeScript/Bun)
-│   ├── src/
-│   │   ├── index.ts    # Main server
-│   │   ├── stripe.ts   # Stripe webhook handlers
-│   │   ├── instance.ts # Instance management
-│   │   └── email.ts    # Email templates
-│   └── Dockerfile
-├── web/                 # Web frontend (Next.js + shadcn/ui)
-│   ├── src/app/
-│   │   ├── page.tsx    # Landing page
-│   │   ├── admin/      # Admin dashboard
-│   │   └── success/    # Post-checkout page
-│   └── Dockerfile
-├── stats/              # Stats dashboard
-├── templates/          # Instance docker-compose template
-├── docker-compose.yml  # Main orchestration
-└── .env.example
+                    *.your-domain.com
+                           │
+                           ▼
+                       TRAEFIK (SSL)
+                           │
+       ┌───────────────────┼───────────────────┐
+       ▼                   ▼                   ▼
+   Landing Page      Automation API      Stats Dashboard
+   (Next.js)         (Bun/Express)       (Express)
+                           │
+           ┌───────────────┴───────────────┐
+           ▼                               ▼
+    FREE INSTANCE                   PAID INSTANCE
+    (5GB, no ML)                    (200GB-1TB, ML)
+                                           │
+                                           ▼
+                                    Shared ML Service
 ```
 
-## 🎯 API Endpoints
+## Environment Variables
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/checkout/:plan` | GET | Create Stripe checkout session |
-| `/webhook` | POST | Stripe webhook handler |
-| `/status/:sessionId` | GET | Check provisioning status |
-| `/health` | GET | Health check |
-| `/api/instances` | GET | List all instances (Admin) |
-| `/api/instances/:id` | DELETE | Delete instance (Admin) |
-| `/api/instances/:id/stop` | POST | Stop instance (Admin) |
-| `/api/instances/:id/start` | POST | Start instance (Admin) |
+See [.env.example](.env.example) for all options.
 
-## 🔧 Admin Dashboard
+**Required:**
+- `DOMAIN` - Your domain (e.g., `sphoto.example.com`)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PRO`
+- `RESEND_API_KEY`
+- `ADMIN_API_KEY` - Generate with `openssl rand -hex 32`
+- `SHARED_FREE_API_KEY`, `SHARED_PAID_API_KEY` - From Immich instances
 
-Access the admin dashboard at `https://yourdomain.com/admin`
+## Documentation
 
-Features:
-- View all instances with status
-- Start/Stop/Delete instances
-- See storage usage per instance
-- Quick links to each instance
+- [Local Development](docs/LOCAL-DEVELOPMENT.md)
+- [Infrastructure & Storage](docs/INFRASTRUCTURE.md)
 
-## 📱 Mobile App
+## License
 
-Users can use the official **Immich** mobile app:
-1. Download from [App Store](https://apps.apple.com/app/immich/id1613945652) or [Play Store](https://play.google.com/store/apps/details?id=app.alextran.immich)
-2. Enter server URL: `https://username.yourdomain.com`
-3. Login with credentials from welcome email
-
-## 🤝 Credits
-
-- [Immich](https://immich.app) - The amazing open-source photo platform this is built on
-- [Traefik](https://traefik.io) - Cloud-native reverse proxy
-- [shadcn/ui](https://ui.shadcn.com) - Beautiful UI components
-
-## 📄 License
-
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  Built with ❤️ by <a href="https://github.com/arturict">arturict</a>
-</p>
+Based on [Immich](https://github.com/immich-app/immich) (AGPL-3.0)

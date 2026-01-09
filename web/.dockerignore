@@ -1,4 +1,4 @@
-node_modules/
-coverage/
-.svelte-kit
-build/
+node_modules
+.next
+.git
+*.md

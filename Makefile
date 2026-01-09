@@ -1,152 +1,203 @@
-dev:
-	@trap 'make dev-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.dev.yml up --remove-orphans
+# =============================================================================
+# SPhoto Development Makefile
+# =============================================================================
+# Uses Bun for all JavaScript/TypeScript operations
+# Run 'make help' to see all available commands
 
-dev-down:
-	docker compose -f ./docker/docker-compose.dev.yml down --remove-orphans
+.PHONY: help dev dev-setup dev-down dev-logs web automation immich immich-down \
+        immich-logs install clean clean-web typecheck lint users nuke stripe-listen
 
-dev-update:
-	@trap 'make dev-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.dev.yml up --build -V --remove-orphans
+# Default target
+help:
+	@echo "SPhoto Development Commands"
+	@echo "==========================="
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  make dev-setup    - First-time setup (creates .env.local, installs deps)"
+	@echo "  make dev          - Start Immich containers"
+	@echo "  make web          - Start web dev server (port 3000)"
+	@echo "  make automation   - Start automation server (port 3001)"
+	@echo ""
+	@echo "Services:"
+	@echo "  make immich       - Start only Immich containers"
+	@echo "  make immich-down  - Stop Immich containers"
+	@echo "  make dev-down     - Stop all containers"
+	@echo "  make dev-logs     - Follow container logs"
+	@echo ""
+	@echo "Dependencies:"
+	@echo "  make install      - Install all dependencies (web + automation)"
+	@echo "  make install-web  - Install web dependencies only"
+	@echo "  make install-auto - Install automation dependencies only"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make users        - List all shared users"
+	@echo "  make nuke         - Delete all shared users (for testing)"
+	@echo "  make stripe-listen- Forward Stripe webhooks to localhost"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  make typecheck    - Run TypeScript checks (automation)"
+	@echo "  make lint         - Run ESLint (web)"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make clean        - Remove all local data and containers"
+	@echo "  make clean-web    - Remove web node_modules and .next"
+	@echo "  make clean-auto   - Remove automation node_modules"
+	@echo ""
+	@echo "Local URLs:"
+	@echo "  - Web:          http://localhost:3000"
+	@echo "  - Automation:   http://localhost:3001"
+	@echo "  - Free Immich:  http://localhost:2283"
+	@echo "  - Paid Immich:  http://localhost:2284"
+	@echo ""
+	@echo "For detailed setup instructions, see: docs/LOCAL-DEVELOPMENT.md"
+	@echo ""
 
-dev-scale:
-	@trap 'make dev-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.dev.yml up --build -V --scale immich-server=3 --remove-orphans
+# =============================================================================
+# First-time setup
+# =============================================================================
+dev-setup:
+	@echo "Setting up local development environment..."
+	@./scripts/dev-setup.sh
 
-dev-docs:
-	npm --prefix docs run start
+# =============================================================================
+# Install dependencies
+# =============================================================================
+install: install-web install-auto
+	@echo "All dependencies installed!"
 
-.PHONY: e2e
-e2e:
-	@trap 'make e2e-down' EXIT; COMPOSE_BAKE=true docker compose -f ./e2e/docker-compose.yml up --remove-orphans
+install-web:
+	@echo "Installing web dependencies..."
+	@cd web && bun install
 
-e2e-dev:
-	@trap 'make e2e-down' EXIT; COMPOSE_BAKE=true docker compose -f ./e2e/docker-compose.dev.yml up --remove-orphans
+install-auto:
+	@echo "Installing automation dependencies..."
+	@cd automation && bun install
 
-e2e-update:
-	@trap 'make e2e-down' EXIT; COMPOSE_BAKE=true docker compose -f ./e2e/docker-compose.yml up --build -V --remove-orphans
+# =============================================================================
+# Full development stack
+# =============================================================================
+dev: immich
+	@echo ""
+	@echo "Immich containers started!"
+	@echo ""
+	@echo "Now start web and automation in separate terminals:"
+	@echo "  Terminal 1: make web"
+	@echo "  Terminal 2: make automation"
+	@echo ""
+	@echo "Or use 'make dev-all' to run everything in background (no hot reload)"
 
-e2e-down:
-	docker compose -f ./e2e/docker-compose.yml down --remove-orphans
+dev-all: immich
+	@if [ ! -f .env.local ]; then \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
+	@echo "Starting web and automation in background..."
+	@set -a && . ./.env.local && set +a && cd web && bun install && bun run dev &
+	@set -a && . ./.env.local && set +a && cd automation && bun install && bun run dev &
+	@echo "All services started in background"
 
-prod:
-	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --remove-orphans
+dev-down: immich-down
+	@echo "All services stopped"
 
-prod-down:
-	docker compose -f ./docker/docker-compose.prod.yml down --remove-orphans
+dev-logs:
+	docker compose -f docker-compose.local.yml logs -f
 
-prod-scale:
-	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --scale immich-server=3 --scale immich-microservices=3 --remove-orphans
+# =============================================================================
+# Immich containers only
+# =============================================================================
+immich:
+	@echo "Starting Immich containers..."
+	@mkdir -p .local/instances/_shared_users
+	@mkdir -p .local/free/uploads .local/free/db
+	@mkdir -p .local/paid/uploads .local/paid/db
+	docker compose -f docker-compose.local.yml up -d
 
-.PHONY: open-api
-open-api:
-	cd ./open-api && bash ./bin/generate-open-api.sh
+immich-down:
+	docker compose -f docker-compose.local.yml down
 
-open-api-dart:
-	cd ./open-api && bash ./bin/generate-open-api.sh dart
+immich-logs:
+	docker compose -f docker-compose.local.yml logs -f
 
-open-api-typescript:
-	cd ./open-api && bash ./bin/generate-open-api.sh typescript
+# =============================================================================
+# Individual services (run in foreground for hot reload)
+# =============================================================================
+web:
+	@echo "Starting web dev server on http://localhost:3000..."
+	@if [ ! -f .env.local ]; then \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
+	@set -a && . ./.env.local && set +a && \
+		cd web && bun install && PORT=3000 bun run dev
 
-sql:
-	pnpm --filter immich run sync:sql
+automation:
+	@echo "Starting automation dev server on http://localhost:3001..."
+	@if [ ! -f .env.local ]; then \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
+	@set -a && . ./.env.local && set +a && \
+		cd automation && bun install && PORT=3001 bun run dev
 
-attach-server:
-	docker exec -it docker_immich-server_1 sh
+# =============================================================================
+# Code Quality
+# =============================================================================
+typecheck:
+	cd automation && bun run typecheck
 
-renovate:
-  LOG_LEVEL=debug npx renovate --platform=local --repository-cache=reset
+lint:
+	cd web && bun run lint
 
-# Directories that need to be created for volumes or build output
-VOLUME_DIRS = \
-	./.pnpm-store \
-	./web/.svelte-kit \
-	./web/node_modules \
-	./web/coverage \
-	./e2e/node_modules \
-	./docs/node_modules \
-	./server/node_modules \
-	./open-api/typescript-sdk/node_modules \
-	./.github/node_modules \
-	./node_modules \
-	./cli/node_modules
+# =============================================================================
+# Cleanup
+# =============================================================================
+clean: immich-down
+	docker compose -f docker-compose.local.yml down -v 2>/dev/null || true
+	rm -rf .local
+	@echo "Cleaned up all local data and volumes"
 
-# Include .env file if it exists
--include docker/.env
+clean-web:
+	@echo "Cleaning web build artifacts..."
+	rm -rf web/node_modules web/.next web/bun.lockb
 
-MODULES = e2e server web cli sdk docs .github
+clean-auto:
+	@echo "Cleaning automation build artifacts..."
+	rm -rf automation/node_modules automation/bun.lockb
 
-# directory to package name mapping function
-#   cli     = @immich/cli
-#   docs    = documentation
-#   e2e     = immich-e2e
-#   open-api/typescript-sdk = @immich/sdk
-#   server  = immich
-#   web     = immich-web
-map-package = $(subst sdk,@immich/sdk,$(subst cli,@immich/cli,$(subst docs,documentation,$(subst e2e,immich-e2e,$(subst server,immich,$(subst web,immich-web,$1))))))
+clean-all: clean-web clean-auto
+	@echo "All node_modules cleaned"
 
-audit-%:
-	pnpm --filter $(call map-package,$*) audit fix
-install-%:
-	pnpm --filter $(call map-package,$*) install $(if $(FROZEN),--frozen-lockfile) $(if $(OFFLINE),--offline)
-build-cli: build-sdk
-build-web: build-sdk
-build-%: install-%
-	pnpm --filter $(call map-package,$*) run build
-format-%:
-	pnpm --filter $(call map-package,$*) run format:fix
-lint-%:
-	pnpm --filter $(call map-package,$*) run lint:fix
-check-%:
-	pnpm --filter $(call map-package,$*) run check
-check-web:
-	pnpm --filter immich-web run check:typescript
-	pnpm --filter immich-web run check:svelte
-test-%:
-	pnpm --filter $(call map-package,$*) run test
-test-e2e:
-	docker compose -f ./e2e/docker-compose.yml build
-	pnpm --filter immich-e2e run test
-	pnpm --filter immich-e2e run test:web
-test-medium:
-	docker run \
-    --rm \
-    -v ./server/src:/usr/src/app/src \
-    -v ./server/test:/usr/src/app/test \
-    -v ./server/vitest.config.medium.mjs:/usr/src/app/vitest.config.medium.mjs \
-    -v ./server/tsconfig.json:/usr/src/app/tsconfig.json \
-    -e NODE_ENV=development \
-    immich-server:latest \
-    -c "pnpm test:medium -- --run"
-test-medium-dev:
-	docker exec -it immich_server /bin/sh -c "pnpm run test:medium"
+# =============================================================================
+# Testing utilities
+# =============================================================================
 
-install-all:
-	pnpm -r --filter '!documentation' install
+# Delete all shared users (for testing)
+nuke:
+	@echo "Deleting all shared users..."
+	@if [ -f .env.local ]; then \
+		. ./.env.local && \
+		curl -X POST http://localhost:3001/api/dev/nuke \
+			-H "x-api-key: $${ADMIN_API_KEY}" \
+			-H "Content-Type: application/json" | jq .; \
+	else \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
 
-build-all: $(foreach M,$(filter-out e2e docs .github,$(MODULES)),build-$M) ;
+# List all shared users
+users:
+	@if [ -f .env.local ]; then \
+		. ./.env.local && \
+		curl -s http://localhost:3001/api/shared/users \
+			-H "x-api-key: $${ADMIN_API_KEY}" | jq .; \
+	else \
+		echo "Error: .env.local not found. Run 'make dev-setup' first."; \
+		exit 1; \
+	fi
 
-check-all:
-	pnpm -r --filter '!documentation' run "/^(check|check\:svelte|check\:typescript)$/"
-lint-all:
-	pnpm -r --filter '!documentation' run lint:fix
-format-all:
-	pnpm -r --filter '!documentation' run format:fix
-audit-all:
-	pnpm -r --filter '!documentation' audit fix
-hygiene-all: audit-all
-	pnpm -r --filter '!documentation' run "/(format:fix|check|check:svelte|check:typescript|sql)/"
-
-test-all:
-	pnpm -r --filter '!documentation' run "/^test/"
-
-clean:
-	find . -name "node_modules" -type d -prune -exec rm -rf {} +
-	find . -name "dist" -type d -prune -exec rm -rf '{}' +
-	find . -name "build" -type d -prune -exec rm -rf '{}' +
-	find . -name ".svelte-kit" -type d -prune -exec rm -rf '{}' +
-	find . -name "coverage" -type d -prune -exec rm -rf '{}' +
-	find . -name ".pnpm-store" -type d -prune -exec rm -rf '{}' +
-	command -v docker >/dev/null 2>&1 && docker compose -f ./docker/docker-compose.dev.yml down -v --remove-orphans || true
-	command -v docker >/dev/null 2>&1 && docker compose -f ./e2e/docker-compose.yml down -v --remove-orphans || true
-
-
-setup-server-dev: install-server
-setup-web-dev: install-sdk build-sdk install-web
+# Forward Stripe webhooks to local automation server
+stripe-listen:
+	@echo "Forwarding Stripe webhooks to localhost:3001/webhook..."
+	@echo "Copy the webhook signing secret to .env.local as STRIPE_WEBHOOK_SECRET"
+	@echo ""
+	stripe listen --forward-to localhost:3001/webhook
