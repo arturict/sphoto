@@ -310,8 +310,8 @@ function SuccessContent() {
       <Card className="max-w-md w-full">
         <CardHeader className="text-center pb-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-foreground mb-4" />
-          <CardTitle>Creating your cloud...</CardTitle>
-          <CardDescription>This usually takes 1-2 minutes.</CardDescription>
+          <CardTitle>Creating your account...</CardTitle>
+          <CardDescription>This usually takes a few seconds.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
@@ -325,17 +325,13 @@ function SuccessContent() {
               {progress >= 10 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
               Payment received
             </div>
-            <div className={`flex items-center gap-3 ${progress >= 40 ? "text-foreground" : progress >= 10 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
-              {progress >= 40 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Starting containers
+            <div className={`flex items-center gap-3 ${progress >= 50 ? "text-foreground" : progress >= 10 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
+              {progress >= 50 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
+              Creating your account
             </div>
-            <div className={`flex items-center gap-3 ${progress >= 70 ? "text-foreground" : progress >= 40 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
-              {progress >= 70 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Creating SSL certificate
-            </div>
-            <div className={`flex items-center gap-3 ${progress >= 100 ? "text-foreground" : progress >= 70 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
+            <div className={`flex items-center gap-3 ${progress >= 100 ? "text-foreground" : progress >= 50 ? "animate-pulse text-foreground" : "text-muted-foreground"}`}>
               {progress >= 100 ? <CheckCircle className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border-2 border-current" />}
-              Setting up account
+              Sending welcome email
             </div>
           </div>
           <p className="text-xs text-center text-muted-foreground">
