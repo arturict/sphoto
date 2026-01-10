@@ -79,6 +79,13 @@ export interface SharedUserMigrationResult {
   message: string;
   oldInstance?: 'free' | 'paid';
   newInstance?: 'free' | 'paid';
+  password?: string; // New password for the target instance
+  migration?: {
+    totalAssets: number;
+    migratedAssets: number;
+    failedAssets: number;
+    albums: { total: number; migrated: number };
+  };
 }
 
 export interface ImmichUserCreateDto {

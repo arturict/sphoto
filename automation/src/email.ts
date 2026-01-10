@@ -737,3 +737,103 @@ export async function sendAccountDeletionCancelledEmail(
     console.log(`Account deletion cancelled email sent to ${email}`);
   }
 }
+
+// =============================================================================
+// Upgrade Email (Free -> Paid with Photo Migration)
+// =============================================================================
+
+export async function sendUpgradeEmail(
+  email: string,
+  planName: string,
+  storageGb: number,
+  password: string | null,
+  migratedPhotos: number
+): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Would send upgrade email to ${email} (Resend not configured)`);
+    return;
+  }
+
+  const url = SHARED_INSTANCES.paid.url;
+  
+  const loginInfo = password 
+    ? `
+        <div style="background: #dcfce7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #22c55e;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">🔐 Deine neuen Login-Daten:</p>
+          <p style="margin: 5px 0;"><strong>E-Mail:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Passwort:</strong> <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Bitte ändere dein Passwort nach dem ersten Login.</p>
+        </div>
+      `
+    : '';
+
+  const migrationInfo = migratedPhotos > 0
+    ? `
+        <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #3b82f6;">
+          <p style="margin: 0; color: #1e40af;">
+            📷 <strong>${migratedPhotos} Fotos/Videos</strong> wurden erfolgreich zu deinem neuen Premium-Account übertragen!
+          </p>
+        </div>
+      `
+    : '';
+
+  const { error } = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: email,
+    subject: '🎉 SPhoto: Dein Upgrade auf ' + planName + ' ist abgeschlossen!',
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #111;">
+          <span style="color: #dc2626;">S</span>Photo
+        </h1>
+        
+        <p>Hallo!</p>
+        <p>Herzlichen Glückwunsch! Dein Upgrade auf <strong>${planName}</strong> war erfolgreich.</p>
+        
+        ${migrationInfo}
+        
+        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> ${planName} (${storageGb} GB)</p>
+          <p style="margin: 0;"><strong>Deine neue URL:</strong></p>
+          <p style="margin: 5px 0 0 0; font-size: 18px;">
+            <a href="${url}" style="color: #dc2626;">${url}</a>
+          </p>
+        </div>
+        
+        ${loginInfo}
+        
+        <div style="background: #dcfce7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0; font-weight: bold; color: #166534;">✨ Was ist neu mit ${planName}?</p>
+          <ul style="margin: 0; padding-left: 20px; color: #166534;">
+            <li><strong>${storageGb} GB</strong> Speicherplatz</li>
+            <li><strong>Gesichtserkennung</strong> aktiviert</li>
+            <li><strong>Smart Search</strong> (suche nach "Strand", "Hund", etc.)</li>
+            <li><strong>Schnellere Server</strong> für optimale Performance</li>
+          </ul>
+        </div>
+        
+        <h3>Nächste Schritte:</h3>
+        <ol>
+          <li>Öffne <a href="${url}">${url}</a></li>
+          <li>Melde dich mit deinen neuen Zugangsdaten an</li>
+          <li>Aktualisiere die <strong>Immich App</strong> mit der neuen Server-URL</li>
+        </ol>
+        
+        <p style="background: #e0f2fe; padding: 10px; border-radius: 4px; font-size: 14px;">
+          💡 <strong>App aktualisieren:</strong> In der Immich App unter Einstellungen → Server-URL die neue Adresse eintragen: <code>${url}</code>
+        </p>
+        
+        <p style="color: #666; font-size: 12px; margin-top: 30px;">
+          Fragen? Kontaktiere ${SUPPORT_EMAIL}
+        </p>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Upgrade email error:', error);
+  } else {
+    console.log(`Upgrade email sent to ${email}`);
+  }
+}

@@ -12,11 +12,12 @@ import {
   updateSharedUserTier, 
   updateSharedUserStripe,
   getSharedUserByStripeCustomer,
+  getSharedUserByEmail,
   migrateUserBetweenInstances,
   deleteSharedUser,
   scheduleSubscriptionCancellation,
 } from './shared-users';
-import { sendWelcomeEmail, sendWelcomeEmailShared, sendPaymentFailedEmail, sendPlanChangeEmail, sendCancellationScheduledEmail } from './email';
+import { sendWelcomeEmail, sendWelcomeEmailShared, sendPaymentFailedEmail, sendPlanChangeEmail, sendCancellationScheduledEmail, sendUpgradeEmail } from './email';
 import { CANCELLATION } from './messages';
 import { handlePlanChange } from './plan-migration';
 import { getStripe, isStripeConfigured } from './lib/stripe';
@@ -123,54 +124,117 @@ async function handleWebhookShared(stripe: Stripe, event: Stripe.Event, res: Res
         if (plan) {
           const tier: UserTier = plan.name.toLowerCase() === 'pro' ? 'pro' : 'basic';
           
-          console.log(`Creating paid user ${customerEmail} with ${plan.storage}GB quota`);
-          sessionStatus.set(sessionId, { status: 'processing', message: `Creating account on ${SHARED_INSTANCES.paid.url}...` });
+          // Check if this is an upgrade from free tier
+          const existingUser = getSharedUserByEmail(customerEmail);
+          const isUpgrade = existingUser && existingUser.instance === 'free' && existingUser.status === 'active';
           
-          const result = await createSharedUser(customerEmail, tier, plan.storage);
-          
-          if (result.success && result.user) {
-            // Update Stripe customer metadata
-            await stripe.customers.update(session.customer as string, {
-              metadata: { 
-                sphoto_user_id: result.user.visibleId,
-                sphoto_tier: tier,
-                deployment_mode: 'shared',
-              }
-            });
+          if (isUpgrade) {
+            // UPGRADE PATH: Migrate from free to paid instance with photo migration
+            console.log(`[Upgrade] Detected upgrade for ${customerEmail} from free to ${tier}`);
+            sessionStatus.set(sessionId, { status: 'processing', message: 'Migriere deine Fotos zum Premium-Server...' });
             
-            // Store Stripe IDs in our user record
-            updateSharedUserStripe(
-              result.user.visibleId,
-              session.customer as string,
-              session.subscription as string
-            );
-            
-            sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
-            await sendWelcomeEmailShared(
-              customerEmail,
-              'paid',
-              plan.name,
-              plan.storage,
-              result.password || null
-            );
-            
-            sessionStatus.set(sessionId, { 
-              status: 'complete', 
-              instanceId: result.user.visibleId,
-              instanceUrl: SHARED_INSTANCES.paid.url,
-              email: customerEmail,
-              plan: plan.name,
+            const migrationResult = await migrateUserBetweenInstances(
+              existingUser.visibleId,
               tier,
-              autoSetup: true,
-            });
+              plan.storage
+            );
             
-            console.log(`Paid user ${customerEmail} created successfully`);
+            if (migrationResult.success) {
+              // Update Stripe customer metadata
+              await stripe.customers.update(session.customer as string, {
+                metadata: { 
+                  sphoto_user_id: existingUser.visibleId,
+                  sphoto_tier: tier,
+                  deployment_mode: 'shared',
+                }
+              });
+              
+              // Store Stripe IDs
+              updateSharedUserStripe(
+                existingUser.visibleId,
+                session.customer as string,
+                session.subscription as string
+              );
+              
+              // Send upgrade email with new password
+              sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Upgrade-Bestätigung...' });
+              await sendUpgradeEmail(
+                customerEmail,
+                plan.name,
+                plan.storage,
+                migrationResult.password || null,
+                migrationResult.migration?.migratedAssets || 0
+              );
+              
+              sessionStatus.set(sessionId, { 
+                status: 'complete', 
+                instanceId: existingUser.visibleId,
+                instanceUrl: SHARED_INSTANCES.paid.url,
+                email: customerEmail,
+                plan: plan.name,
+                tier,
+                autoSetup: true,
+              });
+              
+              console.log(`[Upgrade] ${customerEmail} upgraded successfully: ${migrationResult.migration?.migratedAssets || 0} photos migrated`);
+            } else {
+              sessionStatus.set(sessionId, { 
+                status: 'error', 
+                message: `Upgrade fehlgeschlagen: ${migrationResult.message}` 
+              });
+              console.error(`[Upgrade] Failed for ${customerEmail}: ${migrationResult.message}`);
+            }
           } else {
-            sessionStatus.set(sessionId, { 
-              status: 'error', 
-              message: result.error || 'Account-Erstellung fehlgeschlagen.' 
-            });
-            console.error(`Failed to create user: ${result.error}`);
+            // NEW USER PATH: Create new user on paid instance
+            console.log(`Creating paid user ${customerEmail} with ${plan.storage}GB quota`);
+            sessionStatus.set(sessionId, { status: 'processing', message: `Creating account on ${SHARED_INSTANCES.paid.url}...` });
+            
+            const result = await createSharedUser(customerEmail, tier, plan.storage);
+            
+            if (result.success && result.user) {
+              // Update Stripe customer metadata
+              await stripe.customers.update(session.customer as string, {
+                metadata: { 
+                  sphoto_user_id: result.user.visibleId,
+                  sphoto_tier: tier,
+                  deployment_mode: 'shared',
+                }
+              });
+              
+              // Store Stripe IDs in our user record
+              updateSharedUserStripe(
+                result.user.visibleId,
+                session.customer as string,
+                session.subscription as string
+              );
+              
+              sessionStatus.set(sessionId, { status: 'processing', message: 'Sende Willkommens-E-Mail...' });
+              await sendWelcomeEmailShared(
+                customerEmail,
+                'paid',
+                plan.name,
+                plan.storage,
+                result.password || null
+              );
+              
+              sessionStatus.set(sessionId, { 
+                status: 'complete', 
+                instanceId: result.user.visibleId,
+                instanceUrl: SHARED_INSTANCES.paid.url,
+                email: customerEmail,
+                plan: plan.name,
+                tier,
+                autoSetup: true,
+              });
+              
+              console.log(`Paid user ${customerEmail} created successfully`);
+            } else {
+              sessionStatus.set(sessionId, { 
+                status: 'error', 
+                message: result.error || 'Account-Erstellung fehlgeschlagen.' 
+              });
+              console.error(`Failed to create user: ${result.error}`);
+            }
           }
         } else {
           sessionStatus.set(sessionId, { 

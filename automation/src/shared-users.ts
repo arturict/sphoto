@@ -324,6 +324,333 @@ export async function purgeSharedUser(
 // User Migration (Free <-> Paid)
 // =============================================================================
 
+// Types for photo migration
+interface ImmichAsset {
+  id: string;
+  originalFileName: string;
+  originalPath: string;
+  type: 'IMAGE' | 'VIDEO';
+  fileCreatedAt: string;
+  fileModifiedAt: string;
+  checksum: string;
+}
+
+interface ImmichAlbum {
+  id: string;
+  albumName: string;
+  description?: string;
+  createdAt: string;
+  assets: Array<{ id: string }>;
+}
+
+interface PhotoMigrationResult {
+  success: boolean;
+  totalAssets: number;
+  migratedAssets: number;
+  failedAssets: number;
+  albums: {
+    total: number;
+    migrated: number;
+  };
+  errors: string[];
+}
+
+/**
+ * Downloads an asset's original file from an Immich instance.
+ * Returns the file as a Buffer for re-uploading.
+ */
+async function downloadAssetOriginal(
+  instance: 'free' | 'paid',
+  assetId: string
+): Promise<{ ok: boolean; buffer?: Buffer; error?: string }> {
+  const config = getInstanceConfig(instance);
+  
+  if (!config.apiKey) {
+    return { ok: false, error: 'No API key' };
+  }
+
+  try {
+    const response = await fetch(`${config.internalUrl}/api/assets/${assetId}/original`, {
+      headers: {
+        'x-api-key': config.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}` };
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { ok: true, buffer };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Uploads an asset to an Immich instance using multipart form data.
+ * Returns the new asset ID on success.
+ */
+async function uploadAssetToInstance(
+  instance: 'free' | 'paid',
+  targetUserId: string,
+  buffer: Buffer,
+  filename: string,
+  fileCreatedAt: string,
+  assetType: 'IMAGE' | 'VIDEO'
+): Promise<{ ok: boolean; assetId?: string; error?: string }> {
+  const config = getInstanceConfig(instance);
+  
+  if (!config.apiKey) {
+    return { ok: false, error: 'No API key' };
+  }
+
+  try {
+    // Create form data for multipart upload
+    const formData = new FormData();
+    
+    // Determine MIME type from filename
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    const mimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      heic: 'image/heic',
+      heif: 'image/heif',
+      mp4: 'video/mp4',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska',
+      webm: 'video/webm',
+    };
+    const mimeType = mimeTypes[ext] || (assetType === 'VIDEO' ? 'video/mp4' : 'image/jpeg');
+    
+    // Create a Blob from the buffer
+    const blob = new Blob([buffer], { type: mimeType });
+    formData.append('assetData', blob, filename);
+    
+    // Add required metadata
+    formData.append('deviceAssetId', `migration-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    formData.append('deviceId', 'sphoto-migration');
+    formData.append('fileCreatedAt', fileCreatedAt);
+    formData.append('fileModifiedAt', fileCreatedAt);
+
+    const response = await fetch(`${config.internalUrl}/api/assets`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': config.apiKey,
+        // Note: Don't set Content-Type for FormData, browser/fetch sets it with boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { ok: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+
+    const result = await response.json() as { id: string };
+    return { ok: true, assetId: result.id };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Migrates all photos/videos from one Immich instance to another.
+ * This is used during tier upgrades (free -> paid) to preserve user data.
+ * 
+ * Process:
+ * 1. Fetch all assets from source instance (paginated)
+ * 2. Download each asset's original file
+ * 3. Upload to target instance
+ * 4. Migrate albums (create on target, add migrated assets)
+ * 
+ * @param sourceInstance - 'free' or 'paid'
+ * @param targetInstance - 'free' or 'paid' (opposite of source)
+ * @param sourceUserId - Immich user ID on source instance
+ * @param targetUserId - Immich user ID on target instance (must already exist)
+ */
+export async function migrateUserPhotosToNewInstance(
+  sourceInstance: 'free' | 'paid',
+  targetInstance: 'free' | 'paid',
+  sourceUserId: string,
+  targetUserId: string
+): Promise<PhotoMigrationResult> {
+  const result: PhotoMigrationResult = {
+    success: false,
+    totalAssets: 0,
+    migratedAssets: 0,
+    failedAssets: 0,
+    albums: { total: 0, migrated: 0 },
+    errors: [],
+  };
+
+  console.log(`[Migration] Starting photo migration from ${sourceInstance} to ${targetInstance}`);
+  console.log(`[Migration] Source user: ${sourceUserId}, Target user: ${targetUserId}`);
+
+  // Map of old asset ID -> new asset ID (for album migration)
+  const assetIdMap = new Map<string, string>();
+
+  // Step 1: Fetch all assets with pagination
+  const PAGE_SIZE = 1000;
+  let allAssets: ImmichAsset[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const searchResult = await immichApiCall<{ assets: { items: ImmichAsset[]; nextPage: string | null } }>(
+      sourceInstance,
+      '/api/search/metadata',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ownerId: sourceUserId,
+          size: PAGE_SIZE,
+          page,
+        }),
+      }
+    );
+
+    if (!searchResult.ok || !searchResult.data) {
+      result.errors.push(`Failed to fetch assets page ${page}: ${searchResult.error}`);
+      return result;
+    }
+
+    const pageAssets = searchResult.data.assets.items;
+    allAssets = allAssets.concat(pageAssets);
+    
+    console.log(`[Migration] Page ${page}: fetched ${pageAssets.length} assets (total: ${allAssets.length})`);
+
+    if (pageAssets.length < PAGE_SIZE || searchResult.data.assets.nextPage === null) {
+      hasMore = false;
+    } else {
+      page++;
+    }
+  }
+
+  result.totalAssets = allAssets.length;
+  console.log(`[Migration] Found ${allAssets.length} total assets to migrate`);
+
+  if (allAssets.length === 0) {
+    result.success = true;
+    console.log('[Migration] No assets to migrate - completing successfully');
+    return result;
+  }
+
+  // Step 2: Download and upload each asset
+  for (let i = 0; i < allAssets.length; i++) {
+    const asset = allAssets[i];
+    
+    // Download from source
+    const downloadResult = await downloadAssetOriginal(sourceInstance, asset.id);
+    if (!downloadResult.ok || !downloadResult.buffer) {
+      result.failedAssets++;
+      result.errors.push(`Download failed for ${asset.originalFileName}: ${downloadResult.error}`);
+      console.log(`[Migration] Failed to download ${asset.originalFileName}: ${downloadResult.error}`);
+      continue;
+    }
+
+    // Upload to target
+    const uploadResult = await uploadAssetToInstance(
+      targetInstance,
+      targetUserId,
+      downloadResult.buffer,
+      asset.originalFileName,
+      asset.fileCreatedAt,
+      asset.type
+    );
+
+    if (!uploadResult.ok || !uploadResult.assetId) {
+      result.failedAssets++;
+      result.errors.push(`Upload failed for ${asset.originalFileName}: ${uploadResult.error}`);
+      console.log(`[Migration] Failed to upload ${asset.originalFileName}: ${uploadResult.error}`);
+      continue;
+    }
+
+    // Track mapping for album migration
+    assetIdMap.set(asset.id, uploadResult.assetId);
+    result.migratedAssets++;
+
+    // Log progress every 25 files or at the end
+    if ((i + 1) % 25 === 0 || i + 1 === allAssets.length) {
+      console.log(`[Migration] Progress: ${i + 1}/${allAssets.length} assets (${result.migratedAssets} successful, ${result.failedAssets} failed)`);
+    }
+  }
+
+  // Step 3: Migrate albums
+  console.log('[Migration] Fetching albums...');
+  const albumsResult = await immichApiCall<ImmichAlbum[]>(
+    sourceInstance,
+    `/api/albums?userId=${sourceUserId}`,
+    { method: 'GET' }
+  );
+
+  if (albumsResult.ok && albumsResult.data && albumsResult.data.length > 0) {
+    result.albums.total = albumsResult.data.length;
+    console.log(`[Migration] Found ${albumsResult.data.length} albums to migrate`);
+
+    for (const album of albumsResult.data) {
+      // Create album on target instance
+      const createAlbumResult = await immichApiCall<{ id: string }>(
+        targetInstance,
+        '/api/albums',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            albumName: album.albumName,
+            description: album.description || '',
+          }),
+        }
+      );
+
+      if (!createAlbumResult.ok || !createAlbumResult.data) {
+        result.errors.push(`Failed to create album "${album.albumName}": ${createAlbumResult.error}`);
+        continue;
+      }
+
+      const newAlbumId = createAlbumResult.data.id;
+
+      // Map old asset IDs to new ones
+      const newAssetIds = album.assets
+        .map(a => assetIdMap.get(a.id))
+        .filter((id): id is string => id !== undefined);
+
+      if (newAssetIds.length > 0) {
+        // Add assets to the album
+        const addAssetsResult = await immichApiCall<void>(
+          targetInstance,
+          `/api/albums/${newAlbumId}/assets`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({ ids: newAssetIds }),
+          }
+        );
+
+        if (!addAssetsResult.ok) {
+          result.errors.push(`Failed to add assets to album "${album.albumName}": ${addAssetsResult.error}`);
+        }
+      }
+
+      result.albums.migrated++;
+      console.log(`[Migration] Migrated album "${album.albumName}" with ${newAssetIds.length} assets`);
+    }
+  }
+
+  // Determine overall success (allow partial success if at least 50% migrated)
+  const successRate = result.totalAssets > 0 ? result.migratedAssets / result.totalAssets : 1;
+  result.success = successRate >= 0.5;
+
+  console.log(`[Migration] Completed: ${result.migratedAssets}/${result.totalAssets} assets, ${result.albums.migrated}/${result.albums.total} albums`);
+  if (result.errors.length > 0) {
+    console.log(`[Migration] Errors (${result.errors.length}): ${result.errors.slice(0, 5).join('; ')}${result.errors.length > 5 ? '...' : ''}`);
+  }
+
+  return result;
+}
+
 export async function migrateUserBetweenInstances(
   visibleId: string,
   newTier: UserTier,
@@ -349,12 +676,13 @@ export async function migrateUserBetweenInstances(
   }
 
   const oldInstance = user.instance;
+  const oldImmichUserId = user.immichUserId;
   const quota = newQuotaGB || tierToQuotaGB(newTier);
   const password = generatePassword();
 
-  console.log(`Migrating user ${user.email} from ${oldInstance} to ${newInstance}`);
+  console.log(`[Migration] Starting migration for ${user.email} from ${oldInstance} to ${newInstance}`);
 
-  // Step 1: Create user on new instance
+  // Step 1: Create user on new instance FIRST
   const createDto: ImmichUserCreateDto = {
     email: user.email,
     password,
@@ -379,11 +707,47 @@ export async function migrateUserBetweenInstances(
     };
   }
 
-  // Step 2: Delete user from old instance
-  // Note: This deletes all their photos! They need to re-upload after migration.
+  const newImmichUserId = createResult.data.id;
+  console.log(`[Migration] Created user on ${newInstance} with ID ${newImmichUserId}`);
+
+  // Step 2: Migrate photos from old instance to new instance
+  const photoMigration = await migrateUserPhotosToNewInstance(
+    oldInstance,
+    newInstance,
+    oldImmichUserId,
+    newImmichUserId
+  );
+
+  if (!photoMigration.success) {
+    // Photo migration failed - but user is already created on new instance
+    // We should NOT delete the old user in this case, to prevent data loss
+    console.error(`[Migration] Photo migration failed for ${user.email}: ${photoMigration.errors.join(', ')}`);
+    
+    // Clean up the newly created user on target since migration failed
+    await immichApiCall<void>(
+      newInstance,
+      `/api/admin/users/${newImmichUserId}`,
+      { method: 'DELETE', body: JSON.stringify({ force: true }) }
+    );
+
+    return {
+      success: false,
+      message: `Photo migration failed: ${photoMigration.errors.slice(0, 3).join('; ')}`,
+      migration: {
+        totalAssets: photoMigration.totalAssets,
+        migratedAssets: photoMigration.migratedAssets,
+        failedAssets: photoMigration.failedAssets,
+        albums: photoMigration.albums,
+      },
+    };
+  }
+
+  console.log(`[Migration] Photos migrated successfully: ${photoMigration.migratedAssets}/${photoMigration.totalAssets}`);
+
+  // Step 3: Delete user from old instance ONLY after successful photo migration
   const deleteResult = await immichApiCall<void>(
     oldInstance,
-    `/api/admin/users/${user.immichUserId}`,
+    `/api/admin/users/${oldImmichUserId}`,
     {
       method: 'DELETE',
       body: JSON.stringify({ force: true }),
@@ -391,25 +755,32 @@ export async function migrateUserBetweenInstances(
   );
 
   if (!deleteResult.ok) {
-    console.error(`Warning: Failed to delete user from ${oldInstance}: ${deleteResult.error}`);
-    // Continue anyway - user is created on new instance
+    console.error(`[Migration] Warning: Failed to delete user from ${oldInstance}: ${deleteResult.error}`);
+    // Continue anyway - photos are safely migrated to new instance
   }
 
-  // Step 3: Update local metadata
-  user.immichUserId = createResult.data.id;
+  // Step 4: Update local metadata
+  user.immichUserId = newImmichUserId;
   user.instance = newInstance;
   user.tier = newTier;
   user.quotaGB = quota;
   
   writeFileSync(getUserFilePath(visibleId), JSON.stringify(user, null, 2));
 
-  console.log(`Migration complete for ${user.email}: ${oldInstance} -> ${newInstance}`);
+  console.log(`[Migration] Complete for ${user.email}: ${oldInstance} -> ${newInstance}`);
 
   return {
     success: true,
-    message: `User migrated successfully. New password required.`,
+    message: `Migration successful! ${photoMigration.migratedAssets} photos/videos transferred.`,
     oldInstance,
     newInstance,
+    password,
+    migration: {
+      totalAssets: photoMigration.totalAssets,
+      migratedAssets: photoMigration.migratedAssets,
+      failedAssets: photoMigration.failedAssets,
+      albums: photoMigration.albums,
+    },
   };
 }
 
