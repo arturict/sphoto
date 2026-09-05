@@ -1,5 +1,35 @@
 # Project Overview
 
+## Astra working defaults
+
+These instructions are tuned for GPT-6 Astra. They guide execution; they do not
+change the selected runtime model or expand access and external-action authority.
+
+- Infer the intended outcome from the full conversation. Treat actionable
+  requests such as “can you fix” as authorization to do the scoped work. Continue
+  through implementation and verification; answer pure advice questions as advice.
+- Resolve routine choices from evidence and state material assumptions. Ask only
+  when an unresolved answer changes scope, correctness, cost, or authority.
+  Continue independent work while waiting; incorporate steering without restarting.
+- Complete authorized preparation before seeking final approval. Reuse earlier
+  authorization; preserve the explicit deployment, communication, purchase,
+  privacy, and destructive-action limits below. Do not invent permission gates.
+- User instructions outrank skill guidelines, subject to system/developer rules.
+  If a skill blocks progress, link its exact `SKILL.md`, quote the relevant rule,
+  and explain the concrete conflict; do not present an interpretation as a rule.
+- Delegate independent investigations, disjoint edits, or reviews when parallel
+  work saves time or improves quality. Give each worker a bounded outcome and
+  file ownership; integrate centrally. Respect harness limits and explicit user
+  model choices. Skip delegation overhead for a short, coupled task.
+- Use the smallest meaningful verification for the change and complete applicable
+  repository gates. For instruction-only edits, inspect conflicts, paths, diffs
+  and secrets; skip application builds unless runtime behavior is affected.
+  Repeat passing checks only after a relevant change or new evidence. Do not add
+  tests that merely restate implementation or remove useful behavioral coverage.
+- Lead with the result in concise, plain prose. Use lists when they help scanning;
+  avoid canned summaries, jargon and performative narration. Report what changed,
+  what was verified, and material limits; never turn a local check into a live claim.
+
 SPhoto is a self-hosted, multi-tenant photo cloud platform built on [Immich](https://immich.app).
 It automates customer provisioning via Stripe webhooks, spinning up isolated Immich instances with
 dedicated PostgreSQL and Redis containers. Traefik handles SSL termination and wildcard subdomain
@@ -176,7 +206,8 @@ Tests are located in `automation/src/__tests__/`:
 
 ### Writing New Tests
 
-When adding new functionality, create corresponding tests:
+For new behavior or a defect, add a meaningful regression test when it can
+verify the contract. Do not add tests for prose edits or trivial wrappers:
 
 ```typescript
 // automation/src/__tests__/myfeature.test.ts
@@ -193,7 +224,7 @@ describe('myFunction', () => {
 ### Code Quality Commands
 
 ```bash
-# Full quality check (run before committing)
+# Automation quality check (when automation behavior changes)
 cd automation && bun test && bun run typecheck
 
 # Web app checks
@@ -225,9 +256,10 @@ cd web && bun run lint && bun run build
 1. **Do not modify:**
    - `.env` or any file containing secrets.
    - `instances/` directory (runtime-generated).
-   - `docker-compose.yml` without explicit approval.
+   - Live deployment state without explicit approval. A requested local
+     `docker-compose.yml` patch may be prepared and validated before approval to apply it.
 
-2. **Required human review:**
+2. **Required human review before merge/deployment (prepare and verify the patch first):**
    - Changes to `automation/src/stripe.ts` (payment logic).
    - Changes to Dockerfile or base images.
    - Any new environment variable.
@@ -236,7 +268,7 @@ cd web && bun run lint && bun run build
    - Stripe API: respect Stripe rate limits (100 req/s).
    - Resend: free tier allows 100 emails/day.
 
-4. **Testing before merge:**
+4. **Testing before merge (runtime changes; document-only edits use document checks):**
    - Run `bun run typecheck` in `automation/`.
    - Run `bun run lint && bun run build` in `web/`.
 
