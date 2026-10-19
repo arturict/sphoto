@@ -17,7 +17,7 @@ pnpm only. Run heavy jobs through `capped` on the Linux nodes.
 pnpm install
 pnpm check                                   # lint, typecheck, test, build
 pnpm --filter @sphoto/api test               # one package
-pnpm --filter @sphoto/e2e stack:up && pnpm --filter @sphoto/e2e test
+pnpm --filter @sphoto/e2e stack:up && pnpm --filter @sphoto/e2e e2e
 ```
 
 ## Rules

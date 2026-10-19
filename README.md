@@ -51,7 +51,7 @@ The journeys run against the full Docker stack with tiny quotas and grace period
 ```bash
 pnpm --filter @sphoto/e2e exec playwright install chromium
 pnpm --filter @sphoto/e2e stack:up      # builds the app, starts Immich, stripe-mock and Mailpit
-pnpm --filter @sphoto/e2e test
+pnpm --filter @sphoto/e2e e2e
 pnpm --filter @sphoto/e2e stack:down    # deletes containers, volumes and built images
 ```
 

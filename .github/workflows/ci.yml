@@ -62,7 +62,7 @@ jobs:
       - name: Start the stack
         run: pnpm --filter @sphoto/e2e stack:up
       - name: Run the journeys
-        run: pnpm --filter @sphoto/e2e test
+        run: pnpm --filter @sphoto/e2e e2e
       - name: Stack logs
         if: failure()
         run: pnpm --filter @sphoto/e2e stack:logs
