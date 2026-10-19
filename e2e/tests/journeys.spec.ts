@@ -25,10 +25,10 @@ test.describe.serial('customer journey', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Kostenlos starten' })).toBeVisible();
     const plans = page.locator('#preise');
-    await expect(plans.getByRole('article', { name: 'Plan Basic' })).toContainText('200 GB');
-    await expect(plans.getByRole('article', { name: 'Plan Pro' })).toContainText('1 TB');
-    await expect(plans.getByRole('article', { name: 'Plan Basic' })).toContainText('5');
-    await expect(plans.getByRole('article', { name: 'Plan Pro' })).toContainText('15');
+    // The e2e stack uses tiny storage sizes, so only prices and plan names are asserted here.
+    await expect(plans.getByRole('article', { name: 'Plan Basic' })).toContainText('CHF 5.00 pro Monat');
+    await expect(plans.getByRole('article', { name: 'Plan Pro' })).toContainText('CHF 15.00 pro Monat');
+    await expect(plans.getByRole('article', { name: 'Plan Free' })).toBeVisible();
   });
 
   test('free signup creates the account, rejects a repeat, and mails the credentials', async ({ page }) => {

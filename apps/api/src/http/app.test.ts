@@ -132,6 +132,16 @@ describe('portal', () => {
     expect(h.ctx.users.findLiveByEmail('anna@example.com')?.deletionDueAt).toBeNull();
   });
 
+  it('shows the usage of an account created after the usage reading was cached', async () => {
+    const annaCookie = await loginAs('anna@example.com');
+    await app.request('/api/portal/me', { headers: { cookie: annaCookie } }); // fills the cache before ben exists
+    await app.request('/api/signup/free', json({ email: 'ben@example.com' }));
+    h.immich.seedAsset('free', 'ben@example.com', { filename: 'late.jpg', content: 'LATE!' });
+    const benCookie = await loginAs('ben@example.com');
+    const me = (await (await app.request('/api/portal/me', { headers: { cookie: benCookie } })).json()) as { usedBytes: number; photos: number };
+    expect(me).toMatchObject({ usedBytes: 5, photos: 1 });
+  });
+
   it('shows usage as unknown instead of failing when the photo server is down', async () => {
     const cookie = await loginAs('anna@example.com');
     h.immich.downInstances.add('free');

@@ -67,6 +67,15 @@ export class UsageCache {
     return usage;
   }
 
+  /** Usage of one user. A user the cached reading does not know yet (just created) triggers a fresh reading. */
+  async forUser(instance: InstanceName, immichUserId: string): Promise<ImmichUsage> {
+    const cached = (await this.get(instance)).get(immichUserId);
+    if (cached) return cached;
+    const fresh = (await this.get(instance, { fresh: true })).get(immichUserId);
+    // Immich omits users without assets from some readings; that means zero.
+    return fresh ?? { immichUserId, usageBytes: 0, photos: 0, videos: 0 };
+  }
+
   invalidate(instance: InstanceName): void {
     this.entries.delete(instance);
   }

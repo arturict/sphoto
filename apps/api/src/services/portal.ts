@@ -16,8 +16,8 @@ export async function portalMe(ctx: Ctx, user: User): Promise<PortalMe> {
   let usage: { usedBytes: number; photos: number; videos: number } | null = null;
   if (user.immichUserId && user.status !== 'migrating') {
     try {
-      const entry = (await ctx.usageCache.get(user.instance)).get(user.immichUserId);
-      if (entry) usage = { usedBytes: entry.usageBytes, photos: entry.photos, videos: entry.videos };
+      const entry = await ctx.usageCache.forUser(user.instance, user.immichUserId);
+      usage = { usedBytes: entry.usageBytes, photos: entry.photos, videos: entry.videos };
     } catch (err) {
       ctx.log.warn('Could not read usage for portal', { userId: user.id, error: errorMessage(err) });
     }
