@@ -1,0 +1,12 @@
+# TLS termination and host routing for compose.proxy.yaml. DOMAIN comes from .env.
+{$DOMAIN} {
+	reverse_proxy app:3000
+}
+
+free.{$DOMAIN} {
+	reverse_proxy immich-free:2283
+}
+
+photos.{$DOMAIN} {
+	reverse_proxy immich-paid:2283
+}

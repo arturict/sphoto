@@ -107,6 +107,7 @@ export type PortalMe = z.infer<typeof portalMeSchema>;
 export const upgradeRequestSchema = z.object({ plan: paidTierSchema });
 export const urlResponseSchema = z.object({ url: z.string() });
 export const okSchema = z.object({ ok: z.literal(true) });
+export const exportStartedSchema = z.object({ jobId: z.string() });
 export const deletionResponseSchema = z.object({ deletionDueAt: z.string() });
 
 // --- admin -------------------------------------------------------------------

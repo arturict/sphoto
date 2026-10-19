@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { InvalidWebhookError } from '../billing/billing';
 import type { Ctx } from '../context';
 import { AppError } from '../errors';
+import { ImmichError } from '../immich/gateway';
 import { runMaintenance } from '../jobs/maintenance';
 import { errorMessage } from '../log';
 import { plans } from '../plans';
@@ -54,11 +55,30 @@ export function createApp(ctx: Ctx): Hono<Env> {
   const publicOrigin = new URL(ctx.config.publicUrl).origin;
   const secureCookie = ctx.config.publicUrl.startsWith('https://');
 
-  app.use('*', secureHeaders());
+  app.use(
+    '*',
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        objectSrc: ["'none'"],
+      },
+      xFrameOptions: 'DENY',
+    }),
+  );
 
   app.onError((err, c) => {
     if (err instanceof AppError) return c.json({ error: err.message }, err.status);
     if (err instanceof z.ZodError) return c.json({ error: 'Ungültige Anfrage' }, 400);
+    if (err instanceof ImmichError) {
+      ctx.log.error('Immich error', { path: c.req.path, error: err.message });
+      return c.json({ error: 'Der Foto-Server ist gerade nicht erreichbar. Bitte versuche es in einigen Minuten erneut.' }, 503);
+    }
     ctx.log.error('Unhandled error', { path: c.req.path, error: errorMessage(err) });
     return c.json({ error: 'Interner Fehler' }, 500);
   });
@@ -86,9 +106,20 @@ export function createApp(ctx: Ctx): Hono<Env> {
 
   const clientKey = (c: Context) => c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'direct';
 
+  // Per-address limits stop one mailbox from being flooded; this one stops one client from flooding many.
+  const limitClient = (c: Context, bucket: string, limit: number) => {
+    if (!ctx.rate.allow(`${bucket}:${clientKey(c)}`, limit, 3_600_000)) throw new AppError(429, 'Zu viele Anfragen. Bitte versuche es später erneut.');
+  };
+
   // --- public ------------------------------------------------------------------
 
   app.get('/api/health', (c) => c.json({ status: 'ok' }));
+
+  // Ready once both Immich instances have an admin key; used by the container health check.
+  app.get('/api/ready', (c) => {
+    const ready = Object.values(ctx.readiness).every((state) => state === 'ready');
+    return c.json({ ready, instances: ctx.readiness }, ready ? 200 : 503);
+  });
 
   app.get('/api/config', (c) =>
     c.json({
@@ -103,6 +134,7 @@ export function createApp(ctx: Ctx): Hono<Env> {
   });
 
   app.post('/api/checkout', async (c) => {
+    limitClient(c, 'checkout', 30);
     const input = await body(c, checkoutRequestSchema);
     return c.json(await startCheckout(ctx, input));
   });
@@ -124,6 +156,7 @@ export function createApp(ctx: Ctx): Hono<Env> {
   // --- portal session ----------------------------------------------------------
 
   app.post('/api/portal/login', async (c) => {
+    limitClient(c, 'login', 30);
     const { email } = await body(c, loginRequestSchema);
     await requestLogin(ctx, email);
     return c.json({ ok: true }, 202);

@@ -196,7 +196,8 @@ export class HttpImmichGateway implements ImmichGateway {
         body: JSON.stringify({ force: true }),
       });
     } catch (err) {
-      if (err instanceof ImmichError && err.status === 404) return;
+      // Immich answers 400 "User not found" for a user that is already gone (or queued for removal).
+      if (err instanceof ImmichError && (err.status === 404 || (err.status === 400 && err.message.includes('User not found')))) return;
       throw err;
     }
   }

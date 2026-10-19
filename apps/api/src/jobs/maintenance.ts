@@ -210,7 +210,8 @@ export async function runMaintenance(ctx: Ctx): Promise<MaintenanceReport> {
 export function startScheduler(ctx: Ctx, intervalSeconds: number): () => void {
   let running = false;
   const tick = async () => {
-    if (running) return;
+    // Without the Immich admin keys most tasks cannot work; wait for the first-start setup.
+    if (running || Object.values(ctx.readiness).some((state) => state !== 'ready')) return;
     running = true;
     try {
       await runMaintenance(ctx);

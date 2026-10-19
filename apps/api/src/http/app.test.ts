@@ -50,10 +50,35 @@ describe('public endpoints', () => {
     expect(again.status).toBe(409);
   });
 
+  it('reports ready only after both Immich instances finished their setup', async () => {
+    expect((await app.request('/api/ready')).status).toBe(503);
+    h.ctx.readiness.free = 'ready';
+    expect((await app.request('/api/ready')).status).toBe(503);
+    h.ctx.readiness.paid = 'ready';
+    expect(await (await app.request('/api/ready')).json()).toMatchObject({ ready: true });
+  });
+
+  it('answers 503 with a clear message when the photo server is unreachable', async () => {
+    h.immich.downInstances.add('free');
+    const res = await app.request('/api/signup/free', json({ email: 'anna@example.com' }));
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { error: string }).error).toContain('Foto-Server');
+    expect(h.ctx.users.findLiveByEmail('anna@example.com')).toBeUndefined();
+  });
+
   it('returns JSON errors for unknown API routes', async () => {
     const res = await app.request('/api/nope');
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'Nicht gefunden' });
+  });
+});
+
+describe('abuse limits', () => {
+  it('limits login mails and checkouts per client across addresses', async () => {
+    const asClient = (body: unknown) => json(body, { 'x-forwarded-for': '203.0.113.7' });
+    for (let i = 0; i < 30; i++) expect((await app.request('/api/portal/login', asClient({ email: `u${i}@example.com` }))).status).toBe(202);
+    expect((await app.request('/api/portal/login', asClient({ email: 'u31@example.com' }))).status).toBe(429);
+    expect((await app.request('/api/portal/login', json({ email: 'u31@example.com' }, { 'x-forwarded-for': '203.0.113.8' }))).status).toBe(202);
   });
 });
 

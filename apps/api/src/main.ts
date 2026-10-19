@@ -51,14 +51,23 @@ if (config.env.WEB_DIR) {
 
 serve({ fetch: app.fetch, port: config.port }, (info) => log.info('SPhoto API listening', { port: info.port }));
 
-// Immich needs a minute to migrate its database on first start. The API serves requests meanwhile;
-// signup answers with an error until the instance is ready.
-for (const instance of ['free', 'paid'] as const) {
-  void ctx.immich
-    .ensureReady(instance)
-    .then(() => log.info('Immich ready', { instance }))
-    .catch((err: unknown) => log.error('Immich bootstrap failed', { instance, error: errorMessage(err) }));
+// Immich needs a minute to migrate its database on first start. The API serves requests meanwhile
+// (sign-up answers with a 503 until the instance is ready) and keeps retrying the setup.
+async function bootstrap(instance: InstanceName): Promise<void> {
+  for (;;) {
+    try {
+      await ctx.immich.ensureReady(instance);
+      ctx.readiness[instance] = 'ready';
+      log.info('Immich ready', { instance });
+      return;
+    } catch (err) {
+      log.error('Immich setup failed, retrying', { instance, error: errorMessage(err) });
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
 }
+void bootstrap('free');
+void bootstrap('paid');
 
 if (config.env.RUN_JOBS) startScheduler(ctx, config.env.JOBS_INTERVAL_SECONDS);
 

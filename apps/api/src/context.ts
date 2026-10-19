@@ -27,6 +27,8 @@ export class Background {
   }
 }
 
+export type Readiness = Record<InstanceName, 'pending' | 'ready'>;
+
 export interface Ctx {
   config: Config;
   db: Db;
@@ -41,6 +43,8 @@ export interface Ctx {
   rate: RateLimiter;
   background: Background;
   usageCache: UsageCache;
+  /** Which Immich instances finished their first-start setup. */
+  readiness: Readiness;
 }
 
 const USAGE_TTL_MS = 30_000;
@@ -87,6 +91,7 @@ export function createCtx(deps: Deps): Ctx {
     rate: new RateLimiter(deps.db, deps.clock),
     background: new Background(deps.log),
     usageCache: new UsageCache(deps.immich, deps.clock),
+    readiness: { free: 'pending', paid: 'pending' },
   };
 }
 
