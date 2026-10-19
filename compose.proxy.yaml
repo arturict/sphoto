@@ -1,0 +1,29 @@
+# Optional TLS front door (Caddy, automatic Let's Encrypt). Replaces the published host ports.
+#   docker compose -f compose.yaml -f compose.proxy.yaml up -d
+# Needs DOMAIN in .env and DNS for DOMAIN, free.DOMAIN and photos.DOMAIN pointing at this host.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+      - immich-free
+      - immich-paid
+
+  app:
+    ports: !reset []
+  immich-free:
+    ports: !reset []
+  immich-paid:
+    ports: !reset []
+
+volumes:
+  caddy-data:

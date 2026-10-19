@@ -1,0 +1,26 @@
+{
+  "name": "sphoto",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @sphoto/api dev",
+    "dev:web": "pnpm --filter @sphoto/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "pnpm -r test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}

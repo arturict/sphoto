@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+/* One accent colour. Semantic tokens switch with the system colour scheme, so
+   components never need dark: variants. Text/background pairs are chosen for WCAG AA. */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-sunken: #eef1f5;
+  --fg: #12171f;
+  --muted: #4a5565;
+  --line: #d3d9e1;
+  --accent: #0b64ad;
+  --accent-hover: #09538f;
+  --accent-fg: #ffffff;
+  --accent-soft: #e3f0fb;
+  --danger: #b42318;
+  --danger-hover: #912018;
+  --danger-text: #b42318;
+  --danger-soft: #fdeceb;
+  --ok-text: #0b6b3a;
+  --ok-soft: #e1f5ea;
+  --warn-text: #7a4a00;
+  --warn-soft: #fff3d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --surface: #161c24;
+    --surface-sunken: #11161d;
+    --fg: #e8ecf1;
+    --muted: #a6b0bd;
+    --line: #2b3440;
+    --accent: #5aaaf0;
+    --accent-hover: #7bbcf5;
+    --accent-fg: #07121e;
+    --accent-soft: #14283b;
+    --danger: #d92d20;
+    --danger-hover: #b42318;
+    --danger-text: #ff9a91;
+    --danger-soft: #3a1714;
+    --ok-text: #6fd9a0;
+    --ok-soft: #12301f;
+    --warn-text: #f4c46a;
+    --warn-soft: #382a0c;
+  }
+}
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok-text: var(--ok-text);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn-text: var(--warn-text);
+  --color-warn-soft: var(--warn-soft);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+dialog::backdrop {
+  background: rgb(8 12 18 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

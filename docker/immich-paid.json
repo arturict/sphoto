@@ -1,0 +1,4 @@
+{
+  "machineLearning": { "enabled": true, "urls": ["http://ml:3003"] },
+  "newVersionCheck": { "enabled": false }
+}

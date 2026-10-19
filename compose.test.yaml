@@ -1,0 +1,19 @@
+# Test overlay: Stripe API replaced by stripe-mock, mail caught by Mailpit, no machine learning.
+# Used by the end-to-end tests: docker compose -f compose.yaml -f compose.test.yaml --env-file e2e/.env.test up
+services:
+  app:
+    depends_on:
+      - stripe-mock
+      - mailpit
+
+  stripe-mock:
+    image: stripe/stripe-mock:latest
+    restart: unless-stopped
+    ports:
+      - "${STRIPE_MOCK_PORT:-12111}:12111"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
