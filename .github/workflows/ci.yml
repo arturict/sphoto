@@ -1,0 +1,40 @@
+name: SPhoto CI
+on:
+  push:
+    branches: [clean-tanstack, 'rebuild/**']
+  pull_request:
+    branches: [clean-tanstack]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sphoto-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check-and-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '24.18.1'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Create isolated test configuration
+        run: node scripts/test-env.mjs
+      - name: Build and start the complete stack
+        run: docker compose -p sphoto-ci up -d --build --wait --wait-timeout 300
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Exercise real Immich browser journeys
+        run: pnpm test:e2e
+      - name: Service status on failure
+        if: failure()
+        run: docker compose -p sphoto-ci ps
+      - name: Remove disposable stack
+        if: always()
+        run: docker compose -p sphoto-ci down --volumes --rmi local

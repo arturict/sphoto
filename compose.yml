@@ -1,0 +1,79 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-19000}:3000"
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:19000}
+      IMMICH_URL: http://immich:2283
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      DATABASE_PATH: /app/data/sphoto.sqlite
+      BILLING_MODE: ${BILLING_MODE:-manual}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_BASIC: ${STRIPE_PRICE_BASIC:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      immich:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+  immich:
+    image: ghcr.io/immich-app/immich-server:v3.3.3
+    environment:
+      DB_HOSTNAME: database
+      DB_USERNAME: sphoto
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_DATABASE_NAME: sphoto
+      REDIS_HOSTNAME: redis
+      IMMICH_CONFIG_FILE: /config/immich.json
+    volumes:
+      - photos:/data
+      - ./immich.json:/config/immich.json:ro
+    ports:
+      - "127.0.0.1:${IMMICH_PORT:-19283}:2283"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 2g
+    cpus: 2
+    restart: unless-stopped
+  database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_USER: sphoto
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: sphoto
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - database:/var/lib/postgresql/data
+    shm_size: 128mb
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U sphoto -d sphoto"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 768m
+    cpus: 1
+    restart: unless-stopped
+  redis:
+    image: valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 128m
+    cpus: 0.5
+    restart: unless-stopped
+volumes:
+  app-data:
+  photos:
+  database:
