@@ -1,11 +1,12 @@
-FROM oven/bun:1 AS base
+FROM node:22-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable
 
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -19,7 +20,7 @@ ARG NEXT_PUBLIC_DOMAIN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_DOMAIN=$NEXT_PUBLIC_DOMAIN
 
-RUN bun run build
+RUN pnpm run build
 
 # Production image - use node for running (more stable for Next.js standalone)
 FROM node:22-slim AS runner

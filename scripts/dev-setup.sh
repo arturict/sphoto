@@ -46,7 +46,8 @@ check_command() {
     fi
 }
 
-check_command "bun" "Install Bun: curl -fsSL https://bun.sh/install | bash"
+check_command "pnpm" "Install pnpm: corepack enable (Node 22) or https://pnpm.io/installation"
+check_command "bun" "Install Bun (automation runtime): curl -fsSL https://bun.sh/install | bash"
 check_command "docker" "Install Docker: https://docs.docker.com/get-docker/"
 check_command "docker-compose" "Docker Compose should come with Docker Desktop"
 
@@ -98,7 +99,7 @@ clean_if_corrupted() {
         # Check for Windows-style temp files (WSL corruption indicator)
         if ls "$dir/node_modules/.bin"/.*-* &> /dev/null 2>&1; then
             echo -e "  ${YELLOW}!${NC} Found corrupted node_modules in $dir, cleaning..."
-            rm -rf "$dir/node_modules" "$dir/.next" "$dir/bun.lockb" 2>/dev/null || true
+            rm -rf "$dir/node_modules" "$dir/.next" 2>/dev/null || true
             echo -e "  ${GREEN}✓${NC} Cleaned $dir"
         fi
     fi
@@ -115,14 +116,14 @@ echo -e "  ${GREEN}✓${NC} node_modules check complete"
 echo -e "${YELLOW}Installing dependencies...${NC}"
 
 echo "  Installing web dependencies..."
-(cd web && bun install) || {
+(cd web && pnpm install) || {
     echo -e "${RED}Failed to install web dependencies${NC}"
     exit 1
 }
 echo -e "  ${GREEN}✓${NC} Web dependencies installed"
 
 echo "  Installing automation dependencies..."
-(cd automation && bun install) || {
+(cd automation && pnpm install) || {
     echo -e "${RED}Failed to install automation dependencies${NC}"
     exit 1
 }

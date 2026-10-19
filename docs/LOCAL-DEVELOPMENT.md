@@ -6,7 +6,8 @@ This guide covers setting up SPhoto for local development on your machine.
 
 | Tool | Version | Installation |
 |------|---------|--------------|
-| **Bun** | 1.0+ | `curl -fsSL https://bun.sh/install \| bash` |
+| **pnpm** | 10.x | `corepack enable` (Node 22) or [pnpm.io/installation](https://pnpm.io/installation) |
+| **Bun** | 1.0+ | `curl -fsSL https://bun.sh/install \| bash` (runtime and test runner for `automation/`) |
 | **Docker** | 20.0+ | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
 | **Docker Compose** | 2.0+ | Included with Docker Desktop |
 
@@ -14,7 +15,7 @@ This guide covers setting up SPhoto for local development on your machine.
 
 If you're developing on Windows with WSL2:
 
-1. **Use Bun instead of npm** - This project uses Bun for all JavaScript/TypeScript operations. Bun handles WSL2 paths correctly, unlike npm which can have issues with UNC paths.
+1. **Use pnpm instead of npm** - This project installs dependencies with pnpm; `automation/` runs on Bun. Avoid npm, which can have issues with UNC paths.
 
 2. **Store the repo inside WSL** - Clone the repo to a Linux path (e.g., `~/repos/sphoto`), not a Windows mount (e.g., `/mnt/c/...`). This significantly improves performance.
 
@@ -52,7 +53,7 @@ Run the setup script:
 ```
 
 This script:
-- Checks prerequisites (Bun, Docker)
+- Checks prerequisites (pnpm, Bun, Docker)
 - Creates `.env.local` from template
 - Creates local data directories
 - Cleans any corrupted node_modules (WSL fix)
@@ -238,17 +239,17 @@ Or run the setup script which handles this automatically:
 
 This is usually a WSL path issue. Make sure:
 
-1. You're using Bun (not npm)
+1. You're using pnpm (not npm)
 2. The repo is in a Linux path, not `/mnt/c/...`
 3. Run `make clean-web && make web`
 
 ### "EPERM: operation not permitted" on Windows paths
 
-You're hitting a WSL2 + npm issue. This project uses Bun which doesn't have this problem:
+You're hitting a WSL2 + npm issue. This project uses pnpm instead:
 
 ```bash
 make clean-web
-make web  # Uses Bun, not npm
+make web  # Uses pnpm, not npm
 ```
 
 ### API requests fail with 401

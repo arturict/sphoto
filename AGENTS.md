@@ -90,7 +90,7 @@ docker compose down --remove-orphans
 docker compose up -d --build
 
 # =============================================================================
-# LOCAL DEVELOPMENT (requires Bun)
+# LOCAL DEVELOPMENT (requires pnpm for installs, Bun as automation runtime)
 # =============================================================================
 # First-time setup:
 ./scripts/dev-setup.sh
@@ -102,8 +102,8 @@ make web             # Start web on :3000 (Terminal 1)
 make automation      # Start automation on :3001 (Terminal 2)
 
 # Individual commands:
-cd web && bun install && bun run dev         # Web dev server
-cd automation && bun install && bun run dev  # Automation dev server
+cd web && pnpm install && pnpm run dev         # Web dev server
+cd automation && pnpm install && pnpm run dev  # Automation dev server (runs on Bun)
 
 # Code quality:
 make typecheck       # TypeScript check (automation)
@@ -225,17 +225,17 @@ describe('myFunction', () => {
 
 ```bash
 # Automation quality check (when automation behavior changes)
-cd automation && bun test && bun run typecheck
+cd automation && bun test && pnpm run typecheck
 
 # Web app checks
-cd web && bun run lint && bun run build
+cd web && pnpm run lint && pnpm run build
 ```
 
 | Layer       | Tool          | Command            | Notes                                   |
 |-------------|---------------|--------------------|-----------------------------------------|
 | Unit        | Bun Test      | `bun test`         | Automation server logic                 |
-| Lint        | ESLint        | `bun run lint`     | Web app (via Next.js config)            |
-| Type-check  | TypeScript    | `bun run typecheck`| Automation; `bun run typecheck` for web |
+| Lint        | ESLint        | `pnpm run lint`    | Web app (via Next.js config)            |
+| Type-check  | TypeScript    | `pnpm run typecheck`| Automation; `pnpm exec tsc --noEmit` for web |
 | E2E         | —             | —                  | > TODO: Playwright for checkout flow    |
 | CI          | —             | —                  | > TODO: GitHub Actions workflow         |
 
@@ -249,7 +249,7 @@ cd web && bun run lint && bun run build
   access accordingly.
 - **License:** Project uses Immich (AGPL-3.0). Source code must remain public if distributed.
 - **Backups:** No automated backups; customers are responsible for their own data exports.
-- **Dependency Scanning:** > TODO: Enable `npm audit` / `bun audit` in CI.
+- **Dependency Scanning:** > TODO: Enable `pnpm audit` in CI.
 
 ## Agent Guardrails
 
@@ -269,8 +269,8 @@ cd web && bun run lint && bun run build
    - Resend: free tier allows 100 emails/day.
 
 4. **Testing before merge (runtime changes; document-only edits use document checks):**
-   - Run `bun run typecheck` in `automation/`.
-   - Run `bun run lint && bun run build` in `web/`.
+   - Run `pnpm run typecheck` in `automation/`.
+   - Run `pnpm run lint && pnpm run build` in `web/`.
 
 ## Extensibility Hooks
 

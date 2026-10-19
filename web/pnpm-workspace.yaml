@@ -1,0 +1,6 @@
+# Settings for this standalone package (not a workspace). Like bun before,
+# no dependency install scripts run: sharp ships prebuilt @img binaries and
+# unrs-resolver its napi bindings as optional packages.
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver

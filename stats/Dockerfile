@@ -1,7 +1,8 @@
 FROM node:22-slim
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 COPY . .
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

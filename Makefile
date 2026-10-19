@@ -67,11 +67,11 @@ install: install-web install-auto
 
 install-web:
 	@echo "Installing web dependencies..."
-	@cd web && bun install
+	@cd web && pnpm install
 
 install-auto:
 	@echo "Installing automation dependencies..."
-	@cd automation && bun install
+	@cd automation && pnpm install
 
 # =============================================================================
 # Full development stack
@@ -92,8 +92,8 @@ dev-all: immich
 		exit 1; \
 	fi
 	@echo "Starting web and automation in background..."
-	@set -a && . ./.env.local && set +a && cd web && bun install && bun run dev &
-	@set -a && . ./.env.local && set +a && cd automation && bun install && bun run dev &
+	@set -a && . ./.env.local && set +a && cd web && pnpm install && pnpm run dev &
+	@set -a && . ./.env.local && set +a && cd automation && pnpm install && pnpm run dev &
 	@echo "All services started in background"
 
 dev-down: immich-down
@@ -128,7 +128,7 @@ web:
 		exit 1; \
 	fi
 	@set -a && . ./.env.local && set +a && \
-		cd web && bun install && PORT=3000 bun run dev
+		cd web && pnpm install && PORT=3000 pnpm run dev
 
 automation:
 	@echo "Starting automation dev server on http://localhost:3001..."
@@ -137,16 +137,16 @@ automation:
 		exit 1; \
 	fi
 	@set -a && . ./.env.local && set +a && \
-		cd automation && bun install && PORT=3001 bun run dev
+		cd automation && pnpm install && PORT=3001 pnpm run dev
 
 # =============================================================================
 # Code Quality
 # =============================================================================
 typecheck:
-	cd automation && bun run typecheck
+	cd automation && pnpm run typecheck
 
 lint:
-	cd web && bun run lint
+	cd web && pnpm run lint
 
 # =============================================================================
 # Cleanup
@@ -158,11 +158,11 @@ clean: immich-down
 
 clean-web:
 	@echo "Cleaning web build artifacts..."
-	rm -rf web/node_modules web/.next web/bun.lockb
+	rm -rf web/node_modules web/.next
 
 clean-auto:
 	@echo "Cleaning automation build artifacts..."
-	rm -rf automation/node_modules automation/bun.lockb
+	rm -rf automation/node_modules
 
 clean-all: clean-web clean-auto
 	@echo "All node_modules cleaned"

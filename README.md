@@ -15,7 +15,7 @@ Self-hosted photo storage based on [Immich](https://github.com/immich-app/immich
 ### Local Development
 
 ```bash
-# Prerequisites: Bun 1.0+, Docker
+# Prerequisites: pnpm 10 (corepack enable), Bun 1.0+ (automation runtime), Docker
 
 # 1. Setup
 ./scripts/dev-setup.sh   # or: make dev-setup
