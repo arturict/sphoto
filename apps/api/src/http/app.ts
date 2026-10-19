@@ -107,8 +107,8 @@ export function createApp(ctx: Ctx): Hono<Env> {
   const clientKey = (c: Context) => c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'direct';
 
   // Per-address limits stop one mailbox from being flooded; this one stops one client from flooding many.
-  const limitClient = (c: Context, bucket: string, limit: number) => {
-    if (!ctx.rate.allow(`${bucket}:${clientKey(c)}`, limit, 3_600_000)) throw new AppError(429, 'Zu viele Anfragen. Bitte versuche es später erneut.');
+  const limitClient = (c: Context, bucket: string) => {
+    if (!ctx.rate.allow(`${bucket}:${clientKey(c)}`, ctx.config.env.LOGIN_AND_CHECKOUT_PER_HOUR, 3_600_000)) throw new AppError(429, 'Zu viele Anfragen. Bitte versuche es später erneut.');
   };
 
   // --- public ------------------------------------------------------------------
@@ -134,7 +134,7 @@ export function createApp(ctx: Ctx): Hono<Env> {
   });
 
   app.post('/api/checkout', async (c) => {
-    limitClient(c, 'checkout', 30);
+    limitClient(c, 'checkout');
     const input = await body(c, checkoutRequestSchema);
     return c.json(await startCheckout(ctx, input));
   });
@@ -156,7 +156,7 @@ export function createApp(ctx: Ctx): Hono<Env> {
   // --- portal session ----------------------------------------------------------
 
   app.post('/api/portal/login', async (c) => {
-    limitClient(c, 'login', 30);
+    limitClient(c, 'login');
     const { email } = await body(c, loginRequestSchema);
     await requestLogin(ctx, email);
     return c.json({ ok: true }, 202);

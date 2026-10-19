@@ -43,6 +43,10 @@ const envSchema = z.object({
   EXPORT_COOLDOWN_DAYS: z.coerce.number().min(0).default(30),
   EXPORT_ARCHIVE_BYTES: z.coerce.number().int().positive().default(4 * 1024 ** 3),
 
+  // Per client address and hour (the address comes from X-Forwarded-For).
+  SIGNUPS_PER_HOUR: z.coerce.number().int().positive().default(5),
+  LOGIN_AND_CHECKOUT_PER_HOUR: z.coerce.number().int().positive().default(30),
+
   JOBS_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
   // Set to false in a second replica or when the tasks run from elsewhere.
   RUN_JOBS: bool.default(true),

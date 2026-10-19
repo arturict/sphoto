@@ -5,10 +5,8 @@ import { templates } from '../mail/templates';
 import { tierName } from '../plans';
 import { createAccount, destroyAccount } from './accounts';
 
-const SIGNUPS_PER_HOUR_PER_CLIENT = 5;
-
 export async function freeSignup(ctx: Ctx, input: { email: string; clientKey: string }): Promise<{ instanceUrl: string }> {
-  if (!ctx.rate.allow(`signup:${input.clientKey}`, SIGNUPS_PER_HOUR_PER_CLIENT, 3_600_000)) {
+  if (!ctx.rate.allow(`signup:${input.clientKey}`, ctx.config.env.SIGNUPS_PER_HOUR, 3_600_000)) {
     throw new AppError(429, 'Zu viele Anmeldungen. Bitte versuche es später erneut.');
   }
   if (ctx.users.findLiveByEmail(input.email)) {

@@ -51,6 +51,9 @@ function ensureEnvFile() {
     CANCELLATION_GRACE_DAYS: '0.00004',
     EXPORT_COOLDOWN_DAYS: '0',
     JOBS_INTERVAL_SECONDS: '3600',
+    // Every test runs from one address; the production limits would stop repeated runs.
+    SIGNUPS_PER_HOUR: '1000',
+    LOGIN_AND_CHECKOUT_PER_HOUR: '1000',
     PAID_IMMICH_CONFIG: './docker/immich-paid-noml.json',
     COMPOSE_PROFILES: '',
   };
